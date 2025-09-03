@@ -1,0 +1,5 @@
+"0","#load data"
+"0","household <- read_csv(""data/CSV/SIH19BH.csv"", show_col_types = FALSE)"
+"0","income <- read_csv(""data/CSV/SIH19BI.csv"", show_col_types = FALSE)"
+"0","loans <- read_csv(""data/CSV/SIH19BL.csv"", show_col_types = FALSE)"
+"0","person <- read_csv(""data/CSV/SIH19BP.csv"", show_col_types = FALSE)"
