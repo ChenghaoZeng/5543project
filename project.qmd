@@ -25,6 +25,12 @@ household <- read_csv("data/CSV/SIH19BH.csv", show_col_types = FALSE)
 income <- read_csv("data/CSV/SIH19BI.csv", show_col_types = FALSE)
 loans <- read_csv("data/CSV/SIH19BL.csv", show_col_types = FALSE)
 person <- read_csv("data/CSV/SIH19BP.csv", show_col_types = FALSE)
+
+#load older data
+household2013 <- read_csv("data/CSV/SIH13BH.csv", show_col_types = FALSE)
+income2013 <- read_csv("data/CSV/SIH13BI.csv", show_col_types = FALSE)
+loans2013 <- read_csv("data/CSV/SIH13BL.csv", show_col_types = FALSE)
+person2013 <- read_csv("data/CSV/SIH13BP.csv", show_col_types = FALSE)
 ```
 
 
@@ -40,9 +46,15 @@ loans_agg <- loans %>%
     .groups = "drop"
   )
 
-# quick peek
-loans_agg %>% slice_head(n = 6)
 
+loans_agg2013 <- loans2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
 ```
 
 ```{r}
@@ -56,9 +68,17 @@ iu_agg <- income %>%
     .groups = "drop"
   )
 
-iu_agg %>% slice_head(n = 6)
+iu_agg2013 <- income2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+    hh_num_ius = n(),
+    .groups = "drop"
+  )
+
 
 ```
+
 
 ```{r}
 #Extract household-reference-person health (to attach a person-level wellbeing proxy)
@@ -72,8 +92,16 @@ person_head <- person %>%
       TRUE ~ 0L
     )
   )
+person_head2013 <- person2013 %>%
+  filter(HHPOS == 1) %>%     # household reference person
+  select(ABSHID, DISBPER, AGEBC, SEXP) %>%
+  mutate(
+    head_poor_health_flag = case_when(
+      DISBPER == 2 ~ 1L,
+      TRUE ~ 0L
+    )
+  )
 
-person_head %>% slice_head(n = 6)
 ```
 
 ```{r}
@@ -83,6 +111,12 @@ hh_merged <- household %>%
   left_join(loans_agg, by = "ABSHID") %>%
   left_join(iu_agg, by = "ABSHID") %>%
   left_join(person_head, by = "ABSHID")
+
+
+hh_merged2013 <- household2013 %>%
+  left_join(loans_agg2013, by = "ABSHID") %>%
+  left_join(iu_agg2013, by = "ABSHID") %>%
+  left_join(person_head2013, by = "ABSHID")
 
 #rename variables
 rename_map <- c(
@@ -102,7 +136,16 @@ for(orig in names(rename_map)){
     hh_merged <- hh_merged %>% rename(!!rename_map[[orig]] := all_of(orig))
   }
 }
+
+for(orig in names(rename_map)){
+  if(orig %in% names(hh_merged2013)){
+    hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
+  }
+}
 ```
+
+
+
 
 ```{r}
 #Recode life-cycle group to readable labels & compute derived vars
@@ -136,13 +179,30 @@ hh_merged <- hh_merged %>%
     )
   )
 
+hh_merged2013 <- hh_merged2013 %>%
+  mutate(
+    life_cycle_group = case_when(
+      life_cycle_group_code == 0  ~ "Not applicable",
+      life_cycle_group_code == 1  ~ "Lone person <35",
+      life_cycle_group_code == 2  ~ "Couple (ref <35)",
+      life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+      life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+      life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+      life_cycle_group_code == 6  ~ "One parent w dependents",
+      life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+      life_cycle_group_code == 8  ~ "Couple w non-dep only",
+      life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+      life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+      life_cycle_group_code == 11 ~ "Lone person 65+",
+      TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+    ))
+
 ```
 
 
 ```{r}
 #Set up survey replicate design (household)
 rep_cols <- grep("^WHS\\d{2}$", names(hh_merged), value = TRUE)
-if(length(rep_cols) < 1) stop("Replicate weight columns WHS01..WHS60 not found. Rename or supply replicate weights.")
 
 # create srvyr survey object using Fay method (rho = 0.5)
 hh_svy <- hh_merged %>%
@@ -150,6 +210,19 @@ hh_svy <- hh_merged %>%
                 repweights = all_of(rep_cols),
                 type = "Fay",
                 rho = 0.5)
+
+# Set up survey replicate design (household) - SIH 2013
+rep_cols2013 <- grep("^WHS\\d{4}$", names(hh_merged2013), value = TRUE)
+
+# Create srvyr survey object using Fay method (rho = 0.5)
+
+hh_svy2013 <- hh_merged2013 %>%
+  as_survey_rep(
+    weights = hh_weight,          
+    repweights = all_of(rep_cols2013),
+    type = "Fay",
+    rho = 0.5
+  )
 
 ```
 
@@ -258,4 +331,221 @@ single_parent_summary <- hh_svy %>%
 single_parent_summary %>% collect() %>% print()
 
 ```
+
+
+```{r}
+# --- State code mapping ---
+state_labels <- c(
+  "1" = "New South Wales",
+  "2" = "Victoria",
+  "3" = "Queensland",
+  "4" = "South Australia",
+  "5" = "Western Australia",
+  "6" = "Tasmania",
+  "7" = "Northern Territory",
+  "8" = "Australian Capital Territory",
+  "9" = "Other Territories"
+)
+
+purchase2013 <- hh_svy2013 %>%
+  filter(!is.na(HVALPRIC), HVALPRIC > 0) %>%
+  group_by(STATEHBC) %>%
+  summarise(avg_price = survey_mean(HVALPRIC, na.rm = TRUE)) %>%
+  mutate(
+    year = 2013,
+    STATE = recode(as.character(STATEHBC), !!!state_labels)
+  )
+
+
+purchase2019 <- hh_svy %>%
+  filter(!is.na(HVALPRIC), HVALPRIC > 0) %>%
+  group_by(STATEHEC) %>%
+  summarise(avg_price = survey_mean(HVALPRIC, na.rm = TRUE)) %>%
+  mutate(
+    year = 2019,
+    STATE = recode(as.character(STATEHEC), !!!state_labels)
+  )
+
+# --- Combine ---
+purchase_compare <- bind_rows(purchase2013, purchase2019)
+
+# --- Plot grouped bar chart ---
+ggplot(purchase_compare, aes(x = STATE, y = avg_price/1000, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  geom_text(aes(label = paste0("$", round(avg_price/1000), "k")),
+            position = position_dodge(width = 0.8),
+            vjust = -0.5, size = 3) +
+  labs(
+    title = "Average dwelling purchase prices by State (2013 vs 2019)",
+    x = "State",
+    y = "Average purchase price ($'000s)",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 9) +   # smaller overall font
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 8),  # smaller x labels
+    plot.title = element_text(size = 10, face = "bold")           # smaller title
+  )
+
+```
+
+
+
+
+
+```{r}
+#Weekly housing costs (SIHC basis) - HH	HCOSTSH
+
+# --- Compute weighted means only ---
+cost_summary2013 <- hh_svy2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_cost = survey_mean(HCOSTSH, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2013)
+
+cost_summary2019 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_cost = survey_mean(HCOSTSH, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2019)
+
+# --- Combine ---
+cost_summary <- bind_rows(cost_summary2013, cost_summary2019)
+
+# Ensure numeric (in case survey_mean makes it list-like)
+cost_summary <- cost_summary %>%
+  mutate(mean_cost = as.numeric(mean_cost))
+
+# --- Plot with labels ---
+library(ggplot2)
+
+ggplot(cost_summary, aes(x = life_cycle_group, y = mean_cost, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = paste0("$", round(mean_cost))),
+            position = position_dodge(width = 0.8),
+            vjust = -0.3, size = 3) +
+  labs(
+    title = "Weekly housing costs across life-cycle groups (2013 vs 2019)",
+    x = "Life-cycle group",
+    y = "Mean weekly housing cost ($)",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 8),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+```
+
+
+```{r}
+#Total current weekly IU income from all sources	INCTSCU8
+# --- Weighted mean income 2013 ---
+income_summary2013 <- hh_svy2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_income = survey_mean(hh_income_from_ius, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2013)
+
+# --- Weighted mean income 2019 ---
+income_summary2019 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_income = survey_mean(hh_income_from_ius, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2019)
+
+# --- Combine ---
+income_summary <- bind_rows(income_summary2013, income_summary2019)
+
+# Ensure numeric (survey_mean sometimes returns labelled structure)
+income_summary <- income_summary %>%
+  mutate(mean_income = as.numeric(mean_income))
+
+# --- Plot with labels ---
+library(ggplot2)
+
+ggplot(income_summary, aes(x = life_cycle_group, y = mean_income, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = paste0("$", round(mean_income))),
+            position = position_dodge(width = 0.8),
+            vjust = -0.3, size = 3) +
+  labs(
+    title = "Weekly household income across life-cycle groups (2013 vs 2019)",
+    x = "Life-cycle group",
+    y = "Mean weekly income ($)",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 8),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+```
+
+```{r}
+svy_afford_2013 <- hh_svy2013 %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(afford_ratio = HCOSTSH / hh_income_from_ius)    # ratio in (0, Inf)
+
+svy_afford_2019 <- hh_svy %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(afford_ratio = HCOSTSH / hh_income_from_ius)
+
+# ---- 2) Use survey-aware group summary to get mean ratio (estimate only) ----
+# We use survey_mean(..., vartype = NULL) to request only the estimate column to avoid CI complications.
+summary2013 <- svy_afford_2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(mean_ratio = survey_mean(afford_ratio, vartype = NULL, na.rm = TRUE)) %>%
+  mutate(year = 2013) %>%
+  ungroup()
+
+summary2019 <- svy_afford_2019 %>%
+  group_by(life_cycle_group) %>%
+  summarise(mean_ratio = survey_mean(afford_ratio, vartype = NULL, na.rm = TRUE)) %>%
+  mutate(year = 2019) %>%
+  ungroup()
+
+# ---- 3) Combine and coerce to numeric safely ----
+# The survey_mean result creates a column named "mean_ratio" which should be numeric.
+afford_summary <- bind_rows(summary2013, summary2019) %>%
+# ensure numeric and remove any groups with NA mean
+mutate(mean_ratio = as.numeric(mean_ratio)) %>%
+  filter(!is.na(mean_ratio))
+
+
+# ---- 4) Plot as percentages, show value on top of bars, add 30% reference line ----
+ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 1.2), width = 0.5) +   # <- wider dodge, narrower bars
+  geom_text(aes(label = paste0(round(mean_ratio * 100, 1), "%")),
+            position = position_dodge(width = 1.2),
+            vjust = -0.3, size = 3) +
+  geom_hline(yintercept = 0.30, linetype = "dashed", color = "red") +
+  annotate("text", x = Inf, y = 0.30, label = "30% stress threshold", 
+           hjust = 1.05, vjust = -0.5, color = "red", size = 3) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, NA)) +
+  labs(
+    title = "Mean housing affordability ratio (weekly housing cost ÷ weekly income)\n2013 vs 2019 by life-cycle group",
+    x = "Life-cycle group",
+    y = "Mean housing cost as % of weekly income",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 6),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+
+```
+
 
