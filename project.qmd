@@ -17,6 +17,8 @@ library(survey)
 library(srvyr)
 library(scales)
 library(glue)
+library(plotly)
+library(patchwork)
 ```
 
 ```{r}
@@ -367,26 +369,27 @@ purchase2019 <- hh_svy %>%
   )
 
 # --- Combine ---
-purchase_compare <- bind_rows(purchase2013, purchase2019)
+purchase_compare <- bind_rows(purchase2013, purchase2019) 
 
-# --- Plot grouped bar chart ---
-ggplot(purchase_compare, aes(x = STATE, y = avg_price/1000, fill = factor(year))) +
-  geom_col(position = position_dodge(width = 0.8)) +
-  geom_text(aes(label = paste0("$", round(avg_price/1000), "k")),
-            position = position_dodge(width = 0.8),
-            vjust = -0.5, size = 3) +
+
+p <- ggplot(purchase_compare, aes(x = year, y = avg_price/1000, group = STATE, color = STATE)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  # Note: I'm removing geom_text here as plotly handles tooltips better, 
+  # but you can leave it if you want fixed labels.
   labs(
-    title = "Average dwelling purchase prices by State (2013 vs 2019)",
-    x = "State",
+    title = "Trend in Average dwelling purchase prices by State (2013 to 2019)",
+    x = "Year",
     y = "Average purchase price ($'000s)",
-    fill = "Year"
+    color = "State"
   ) +
-  theme_minimal(base_size = 9) +   # smaller overall font
+  scale_x_continuous(breaks = unique(purchase_compare$year)) +
+  theme_minimal(base_size = 9) +
   theme(
-    axis.text.x = element_text(angle = 30, hjust = 1, size = 8),  # smaller x labels
-    plot.title = element_text(size = 10, face = "bold")           # smaller title
+    plot.title = element_text(size = 10, face = "bold")
   )
 
+ggplotly(p)
 ```
 
 
@@ -418,13 +421,15 @@ cost_summary <- bind_rows(cost_summary2013, cost_summary2019)
 
 # Ensure numeric (in case survey_mean makes it list-like)
 cost_summary <- cost_summary %>%
-  mutate(mean_cost = as.numeric(mean_cost))
+  mutate(mean_cost = as.numeric(mean_cost)) %>% 
+  filter(life_cycle_group != "Not applicable")
 
-# --- Plot with labels ---
-library(ggplot2)
 
-ggplot(cost_summary, aes(x = life_cycle_group, y = mean_cost, fill = factor(year))) +
+
+p <- ggplot(cost_summary, aes(x = life_cycle_group, y = mean_cost, fill = factor(year))) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  # Note: The fixed geom_text labels will still be present, but plotly's
+  # tooltips provide a cleaner interactive experience.
   geom_text(aes(label = paste0("$", round(mean_cost))),
             position = position_dodge(width = 0.8),
             vjust = -0.3, size = 3) +
@@ -440,6 +445,7 @@ ggplot(cost_summary, aes(x = life_cycle_group, y = mean_cost, fill = factor(year
     plot.title = element_text(size = 11, face = "bold")
   )
 
+ggplotly(p)
 ```
 
 
@@ -468,12 +474,11 @@ income_summary <- bind_rows(income_summary2013, income_summary2019)
 
 # Ensure numeric (survey_mean sometimes returns labelled structure)
 income_summary <- income_summary %>%
-  mutate(mean_income = as.numeric(mean_income))
+  mutate(mean_income = as.numeric(mean_income)) %>% 
+  filter(life_cycle_group != "Not applicable")
 
-# --- Plot with labels ---
-library(ggplot2)
 
-ggplot(income_summary, aes(x = life_cycle_group, y = mean_income, fill = factor(year))) +
+p <- ggplot(income_summary, aes(x = life_cycle_group, y = mean_income, fill = factor(year))) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7) +
   geom_text(aes(label = paste0("$", round(mean_income))),
             position = position_dodge(width = 0.8),
@@ -490,6 +495,7 @@ ggplot(income_summary, aes(x = life_cycle_group, y = mean_income, fill = factor(
     plot.title = element_text(size = 11, face = "bold")
   )
 
+ggplotly(p)
 ```
 
 ```{r}
@@ -520,11 +526,11 @@ summary2019 <- svy_afford_2019 %>%
 afford_summary <- bind_rows(summary2013, summary2019) %>%
 # ensure numeric and remove any groups with NA mean
 mutate(mean_ratio = as.numeric(mean_ratio)) %>%
-  filter(!is.na(mean_ratio))
+  filter(!is.na(mean_ratio), life_cycle_group != "Not applicable")
 
 
 # ---- 4) Plot as percentages, show value on top of bars, add 30% reference line ----
-ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = factor(year))) +
+p <- ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = factor(year))) +
   geom_col(position = position_dodge(width = 1.2), width = 0.5) +   # <- wider dodge, narrower bars
   geom_text(aes(label = paste0(round(mean_ratio * 100, 1), "%")),
             position = position_dodge(width = 1.2),
@@ -545,7 +551,104 @@ ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = factor(y
     plot.title = element_text(size = 11, face = "bold")
   )
 
+ggplotly(p)
+```
+```{r}
+#Sought financial help from friends/family due to a shortage of money	CFFAMILY
+# 0. Did not seek financial help from friends/family
+# 1. Sought financial help from friends/family
 
+
+#Ability of household to raise $500 emergency money  EMERGMON  0. Not applicable
+# 1. Could raise $500 within a week
+# 5. Could not raise $500 within a week
+# 99. Not stated
+
+
+
+# Extract underlying data frame
+df <- as.data.frame(hh_svy$variables)
+
+# Base data processing
+fam_counts_only <- df %>%
+  select(life_cycle_group, CFFAMILY, EMERGMON) %>%
+  pivot_longer(cols = c(CFFAMILY, EMERGMON),
+               names_to = "variable", values_to = "value") %>%
+  # 💡 Filter: Keep only the CFFAMILY variable
+  filter(variable == "CFFAMILY", value == 1, life_cycle_group != "Not applicable") %>%
+  group_by(life_cycle_group, variable) %>%
+  summarise(count_1 = n(), .groups = "drop") %>%
+  # Rename variable to neat label
+  mutate(variable = recode(variable,
+                           CFFAMILY = "Help from family")) %>%
+  filter(count_1 > 0) %>%
+  # Calculate percentages (relative to the total count for Help from family)
+  group_by(variable) %>%
+  mutate(perc = count_1 / sum(count_1) * 100,
+         label = paste0(round(perc, 1), "%"))
+
+em_counts_only <- df %>%
+  select(life_cycle_group, CFFAMILY, EMERGMON) %>%
+  pivot_longer(cols = c(CFFAMILY, EMERGMON),
+               names_to = "variable", values_to = "value") %>%
+  # 💡 Filter: Keep only the EMERGMON variable
+  filter(variable == "EMERGMON", value == 1, life_cycle_group != "Not applicable") %>%
+  group_by(life_cycle_group, variable) %>%
+  summarise(count_1 = n(), .groups = "drop") %>%
+  # Rename variable to neat label
+  mutate(variable = recode(variable,
+                           EMERGMON = "Emergency money")) %>%
+  filter(count_1 > 0) %>%
+  # Calculate percentages (relative to the total count for Emergency money)
+  group_by(variable) %>%
+  mutate(perc = count_1 / sum(count_1) * 100,
+         label = paste0(round(perc, 1), "%"))
+
+# Data frame for 'Emergency money'
+em_data <- em_counts_only %>%
+  filter(variable == "Emergency money") %>%
+  mutate(life_cycle_group = droplevels(as.factor(life_cycle_group)))
+
+# Data frame for 'Help from family'
+fam_data <- fam_counts_only  %>%
+  filter(variable == "Help from family") %>%
+  mutate(life_cycle_group = droplevels(as.factor(life_cycle_group)))
+
+plot_native_pie <- function(data, plot_title) {
+  # Ensure the percentages are used for the text display
+  data <- data %>%
+    mutate(life_cycle_group = as.factor(life_cycle_group))
+  
+  plot_ly(data, 
+          labels = ~life_cycle_group, 
+          values = ~count_1, 
+          type = 'pie',
+          # Set the text displayed on the slice, and the hover text
+          text = ~label, 
+          hovertemplate = paste('<b>%{label}</b><br>',
+                                '%{value}<extra></extra>'),
+          textinfo = 'text',
+          insidetextfont = list(color = '#FFFFFF', size = 10),
+          # RColorBrewer must be installed/loaded for this color line
+          marker = list(line = list(color = '#FFFFFF', width = 1)),
+          name = plot_title,
+          domain = list(x = c(0, 1), y = c(0, 1))) %>% 
+    layout(title = list(text = plot_title, font = list(size = 13)),
+           showlegend = TRUE)
+}
+
+# --- GENERATE AND PRINT INTERACTIVE PLOTS ---
+
+# 1. Generate the individual INTERACTIVE plots
+# Note: Use plot_native_pie, NOT plot_pie
+plot_em_interactive <- plot_native_pie(em_data, "Emergency money")
+plot_fam_interactive <- plot_native_pie(fam_data, "Help from family")
+
+# 2. Print the Emergency Money interactive plot
+print(plot_em_interactive)
+
+# 3. Print the Help from Family interactive plot
+print(plot_fam_interactive)
 ```
 
 
