@@ -19,6 +19,10 @@ library(scales)
 library(glue)
 library(plotly)
 library(patchwork)
+library(nnet)
+library(dplyr)
+library(tidyr)
+
 ```
 
 ```{r}
@@ -87,7 +91,7 @@ iu_agg2013 <- income2013 %>%
 
 person_head <- person %>%
   filter(HHPOS == 1) %>%     # household reference person
-  select(ABSHID, SAHQ01, AGEEC, SEXP) %>%
+  select(ABSHID, SAHQ01, AGEEC, SEXP, LVLEDUA) %>%
   mutate(
     head_poor_health_flag = case_when(
       SAHQ01 %in% c(4,5) ~ 1L,  # 4 = Fair, 5 = Poor
@@ -641,8 +645,8 @@ plot_native_pie <- function(data, plot_title) {
 
 # 1. Generate the individual INTERACTIVE plots
 # Note: Use plot_native_pie, NOT plot_pie
-plot_em_interactive <- plot_native_pie(em_data, "Emergency money")
-plot_fam_interactive <- plot_native_pie(fam_data, "Help from family")
+plot_em_interactive <- plot_native_pie(em_data, "No enough Emergency money")
+plot_fam_interactive <- plot_native_pie(fam_data, "Need financial Help from family")
 
 # 2. Print the Emergency Money interactive plot
 print(plot_em_interactive)
@@ -650,5 +654,20 @@ print(plot_em_interactive)
 # 3. Print the Help from Family interactive plot
 print(plot_fam_interactive)
 ```
+
+
+```{r}
+#Weekly housing costs (broad) as a percentage of gross hh income (exc RA) ranges: HCOST10A
+#Number of persons in household:	PERSHBC
+#Level of highest educational attainment: LVLEDUA
+#Tenure type - HH: TENURECF
+#Age of youngest dependent child in household:	AGEKIDH
+#State or Territory of usual residence 2016: STATEHEC
+
+
+explore2019<- svy_afford_2019 %>%
+  select( HCOST10A,life_cycle_group, PERSHBC,afford_ratio, LVLEDUA,AGEKIDH, STATEHEC)
+```
+
 
 
