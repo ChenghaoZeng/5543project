@@ -677,7 +677,14 @@ explore2019<- svy_afford_2019 %>%
     Tenure_type            = TENURECF
   ) %>%
    # Filter out Tenure type == 0 (Not applicable)
-  filter(Tenure_type != 0) 
+  filter(Tenure_type != 0)  %>%
+  # Replace 999 in Age_Youngest_Child with mean of valid ages (0–24)
+  mutate(Age_Youngest_Child = ifelse(
+      Age_Youngest_Child == 999,
+      mean(Age_Youngest_Child[Age_Youngest_Child != 999], na.rm = TRUE),
+      Age_Youngest_Child
+    ))
+    
   
   
 ```
