@@ -683,7 +683,10 @@ explore2019<- svy_afford_2019 %>%
       Age_Youngest_Child == 999,
       mean(Age_Youngest_Child[Age_Youngest_Child != 999], na.rm = TRUE),
       Age_Youngest_Child
-    ))
+    ),
+    # Recode Weekly housing cost ratio variable:
+    # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
+    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
     
   
   
