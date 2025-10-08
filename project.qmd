@@ -820,4 +820,39 @@ ggplot(explore2019, aes(x = factor(Tenure_type), fill = factor(HousingStress))) 
 t.test( Tenure_type ~ HousingStress, data = explore2019)
 ```
 
+```{r}
+# Create a named vector for state labels
+state_labels <- c(
+  "1" = "New South Wales",
+  "2" = "Victoria",
+  "3" = "Queensland",
+  "4" = "South Australia",
+  "5" = "Western Australia",
+  "6" = "Tasmania",
+  "7" = "Northern Territory",
+  "8" = "Australian Capital Territory"
+)
+
+# Plot proportion of housing stress by state
+ggplot(explore2019, aes(x = factor(State), fill = factor(HousingStress))) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Proportion of Households Experiencing Housing Stress by State",
+    x = "State",
+    y = "Proportion within State",
+    fill = "Housing Stress"
+  ) +
+  scale_fill_manual(
+    values = c("#74add1", "#f46d43"),
+    labels = c("0" = "Not stressed", "1" = "Stressed")
+  ) +
+  scale_x_discrete(labels = state_labels) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+#t-test (for 2 groups)
+t.test( State ~ HousingStress, data = explore2019)
+```
 
