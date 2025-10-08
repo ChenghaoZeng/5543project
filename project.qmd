@@ -22,7 +22,7 @@ library(patchwork)
 library(nnet)
 library(dplyr)
 library(tidyr)
-
+library(car)
 ```
 
 ```{r}
@@ -872,5 +872,9 @@ model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size +
 
 summary(model)
 
+```
+
+```{r}
+car::vif(model)
 ```
 
