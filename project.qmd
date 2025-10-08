@@ -673,8 +673,13 @@ explore2019<- svy_afford_2019 %>%
     Affordability_Ratio    = afford_ratio,
     Education_Level        = LVLEDUA,
     Age_Youngest_Child     = AGEKIDH,
-    State                  = STATEHEC
-  )
+    State                  = STATEHEC,
+    Tenure_type            = TENURECF
+  ) %>%
+   # Filter out Tenure type == 0 (Not applicable)
+  filter(Tenure_type != 0) 
+  
+  
 ```
 
 
