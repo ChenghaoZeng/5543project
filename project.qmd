@@ -692,5 +692,17 @@ explore2019<- svy_afford_2019 %>%
   
 ```
 
+```{r}
+# Boxplot: Affordability ratio vs housing stress
+ggplot(explore2019, aes(x = factor(HousingStress), y = Affordability_Ratio, fill = factor(HousingStress))) +
+  geom_boxplot() +
+  scale_x_discrete(labels = c("0" = "Not stressed", "1" = "Stressed")) +
+  labs(
+    title = "Affordability Ratio by Housing Stress",
+    x = "Housing Stress",
+    y = "Affordability Ratio"
+  ) +
+  theme_minimal()
+```
 
 
