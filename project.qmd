@@ -856,3 +856,21 @@ ggplot(explore2019, aes(x = factor(State), fill = factor(HousingStress))) +
 t.test( State ~ HousingStress, data = explore2019)
 ```
 
+```{r}
+explore2019 <- explore2019 %>%
+  mutate(
+    State = as.factor(State),
+    Tenure_type = as.factor(Tenure_type),
+    Education_Level = as.factor(Education_Level)
+  )
+# Fit logistic regression
+model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
+                Affordability_Ratio + Education_Level + 
+                Age_Youngest_Child + State + Tenure_type,
+              data = explore2019,
+                family = binomial(link = "logit"))
+
+summary(model)
+
+```
+
