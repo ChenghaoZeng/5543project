@@ -705,4 +705,18 @@ ggplot(explore2019, aes(x = factor(HousingStress), y = Affordability_Ratio, fill
   theme_minimal()
 ```
 
+```{r}
+# Boxplot: Household size vs housing stress
+ggplot(explore2019, aes(x = factor(HousingStress), y = factor(Household_Size), fill = factor(HousingStress))) +
+  geom_boxplot() +
+  labs(
+    title = "Household Size by Housing Stress",
+    x = "Housing Stress",
+    y = "Household Size (categories)"
+  ) +
+  scale_x_discrete(labels = c("0" = "Not stressed", "1" = "Stressed")) +
+  theme_minimal()
+
+
+```
 
