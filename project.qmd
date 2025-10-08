@@ -719,16 +719,23 @@ t.test(Affordability_Ratio ~ HousingStress, data = explore2019)
 
 
 ```{r}
-# Boxplot: Household size vs housing stress
-ggplot(explore2019, aes(x = factor(HousingStress), y = factor(Household_Size), fill = factor(HousingStress))) +
-  geom_boxplot() +
+# proportion bar chart: Household size vs housing stress
+explore2019 %>%
+  group_by(Household_Size, HousingStress) %>%
+  summarise(n = n()) %>%
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(x = factor(Household_Size), y = prop, fill = factor(HousingStress))) +
+  geom_col(position = "fill") +
   labs(
-    title = "Household Size by Housing Stress",
-    x = "Housing Stress",
-    y = "Household Size (categories)"
+    title = "Proportion of Households Experiencing Housing Stress by Household Size",
+    x = "Household Size (number of people)",
+    y = "Proportion",
+    fill = "Housing Stress"
   ) +
-  scale_x_discrete(labels = c("0" = "Not stressed", "1" = "Stressed")) +
+  scale_fill_manual(values = c("#74add1", "#f46d43"),
+                    labels = c("Not stressed", "Stressed")) +
   theme_minimal()
+
 
 #t-test (for 2 groups)
 t.test(Household_Size ~ HousingStress, data = explore2019)
@@ -749,14 +756,25 @@ t.test(Age_Youngest_Child ~ HousingStress, data = explore2019)
 ```
 
 ```{r}
-ggplot(explore2019, aes(x = factor(HousingStress), y = Education_Level, fill = factor(HousingStress))) +
-  geom_boxplot() +
+ggplot(explore2019, aes(x = factor(Education_Level), fill = factor(HousingStress))) +
+  geom_bar(position = "fill") +
   labs(
-    title = "Education Level by Housing Stress",
-    x = "Housing Stress",
-    y = "Education Level"
+    title = "Proportion of Households Experiencing Housing Stress by Education Level",
+    x = "Education Level",
+    y = "Proportion within Education Level",
+    fill = "Housing Stress"
   ) +
-  theme_minimal()
+  scale_fill_manual(
+    values = c("#74add1", "#f46d43"),
+    labels = c("0" = "Not stressed", "1" = "Stressed")
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
+
+#t-test (for 2 groups)
+t.test( Education_Level ~ HousingStress, data = explore2019)
 ```
 
