@@ -778,3 +778,32 @@ ggplot(explore2019, aes(x = factor(Education_Level), fill = factor(HousingStress
 t.test( Education_Level ~ HousingStress, data = explore2019)
 ```
 
+```{r}
+ggplot(explore2019, aes(x = factor(Tenure_type), fill = factor(HousingStress))) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Proportion of Households Experiencing Housing Stress by Tenure Type",
+    x = "Tenure Type",
+    y = "Proportion within Tenure Type",
+    fill = "Housing Stress"
+  ) +
+  scale_fill_manual(
+    values = c("#74add1", "#f46d43"),
+    labels = c("0" = "Not stressed", "1" = "Stressed")
+  ) +
+  scale_x_discrete(
+    labels = c(
+      "1" = "Owner (no mortgage)",
+      "2" = "Owner (with mortgage)",
+      "3" = "Renter",
+      "4" = "Other"
+    )
+  ) +
+  theme_minimal()
+
+
+#t-test (for 2 groups)
+t.test( Tenure_type ~ HousingStress, data = explore2019)
+```
+
+
