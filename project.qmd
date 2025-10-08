@@ -768,6 +768,20 @@ ggplot(explore2019, aes(x = factor(Education_Level), fill = factor(HousingStress
     values = c("#74add1", "#f46d43"),
     labels = c("0" = "Not stressed", "1" = "Stressed")
   ) +
+  scale_x_discrete(labels =c(
+  "0" = "Not applicable",
+  "1" = "Postgraduate Degree",
+  "2" = "Graduate Diploma and Graduate Certificate",
+  "3" = "Bachelor Degree",
+  "4" = "Advanced Diploma and Diploma",
+  "5" = "Certificate III and IV",
+  "6" = "Year 12 or equivalent",
+  "7" = "Year 11",
+  "8" = "Year 10",
+  "9" = "Certificate I and II",
+  "10" = "Year 9 and below",
+  "11" = "Certificate n.f.d.",
+  "12" = "Level not determined (non-school only)")) +
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
