@@ -717,6 +717,7 @@ t.test(Affordability_Ratio ~ HousingStress, data = explore2019)
 
 ```
 
+
 ```{r}
 # Boxplot: Household size vs housing stress
 ggplot(explore2019, aes(x = factor(HousingStress), y = factor(Household_Size), fill = factor(HousingStress))) +
@@ -742,6 +743,8 @@ ggplot(explore2019, aes(x = factor(HousingStress), y = Age_Youngest_Child, fill 
   ) +
   theme_minimal()
 
+#t-test (for 2 groups)
+t.test(Age_Youngest_Child ~ HousingStress, data = explore2019)
 ```
 
 ```{r}
