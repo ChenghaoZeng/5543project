@@ -703,6 +703,18 @@ ggplot(explore2019, aes(x = factor(HousingStress), y = Affordability_Ratio, fill
     y = "Affordability Ratio"
   ) +
   theme_minimal()
+
+#Summary Statistics Table
+explore2019 %>%
+  group_by(HousingStress) %>%
+  summarise(
+    mean_afford = mean(Affordability_Ratio, na.rm = TRUE),
+    median_afford = median(Affordability_Ratio, na.rm = TRUE),
+    mean_child_age = mean(Age_Youngest_Child, na.rm = TRUE)
+  )
+#t-test (for 2 groups)
+t.test(Affordability_Ratio ~ HousingStress, data = explore2019)
+
 ```
 
 ```{r}
@@ -733,6 +745,14 @@ ggplot(explore2019, aes(x = factor(HousingStress), y = Age_Youngest_Child, fill 
 ```
 
 ```{r}
+ggplot(explore2019, aes(x = factor(HousingStress), y = Education_Level, fill = factor(HousingStress))) +
+  geom_boxplot() +
+  labs(
+    title = "Education Level by Housing Stress",
+    x = "Housing Stress",
+    y = "Education Level"
+  ) +
+  theme_minimal()
 
 ```
 
