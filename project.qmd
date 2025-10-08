@@ -719,4 +719,20 @@ ggplot(explore2019, aes(x = factor(HousingStress), y = factor(Household_Size), f
 
 
 ```
+```{r}
+# Boxplot: Age of youngest child vs housing stress
+ggplot(explore2019, aes(x = factor(HousingStress), y = Age_Youngest_Child, fill = factor(HousingStress))) +
+  geom_boxplot() +
+  labs(
+    title = "Age of Youngest Dependent Child by Housing Stress",
+    x = "Housing Stress",
+    y = "Age of Youngest Child (years)"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+
+```
 
