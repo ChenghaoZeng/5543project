@@ -730,7 +730,8 @@ ggplot(explore2019, aes(x = factor(HousingStress), y = factor(Household_Size), f
   scale_x_discrete(labels = c("0" = "Not stressed", "1" = "Stressed")) +
   theme_minimal()
 
-
+#t-test (for 2 groups)
+t.test(Household_Size ~ HousingStress, data = explore2019)
 ```
 ```{r}
 # Boxplot: Age of youngest child vs housing stress
