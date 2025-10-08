@@ -657,7 +657,7 @@ print(plot_fam_interactive)
 
 
 ```{r}
-#Weekly housing costs (broad) as a percentage of gross hh income (exc RA) ranges: HCOST10A
+#Weekly housing costs (broad) as a percentage of gross hh income (exc RA) ranges: weekly_housing_cost_cat
 #Number of persons in household:	PERSHBC
 #Level of highest educational attainment: LVLEDUA
 #Tenure type - HH: TENURECF
@@ -666,7 +666,15 @@ print(plot_fam_interactive)
 
 
 explore2019<- svy_afford_2019 %>%
-  select( HCOST10A,life_cycle_group, PERSHBC,afford_ratio, LVLEDUA,AGEKIDH, STATEHEC)
+  select(
+    HousingCostRatio_Range = weekly_housing_cost_cat,
+    Life_Cycle_Group       = life_cycle_group, 
+    Household_Size         = PERSHBC,
+    Affordability_Ratio    = afford_ratio,
+    Education_Level        = LVLEDUA,
+    Age_Youngest_Child     = AGEKIDH,
+    State                  = STATEHEC
+  )
 ```
 
 
