@@ -363,8 +363,9 @@ purchase2013 <- hh_svy2013 %>%
   summarise(avg_price = survey_mean(HVALPRIC, na.rm = TRUE)) %>%
   mutate(
     year = 2013,
-    STATE = recode(as.character(STATEHBC), !!!state_labels)
+    STATE = state_labels[as.character(STATEHBC)]
   )
+  
 
 
 purchase2019 <- hh_svy %>%
@@ -373,7 +374,7 @@ purchase2019 <- hh_svy %>%
   summarise(avg_price = survey_mean(HVALPRIC, na.rm = TRUE)) %>%
   mutate(
     year = 2019,
-    STATE = recode(as.character(STATEHEC), !!!state_labels)
+    STATE = state_labels[as.character(STATEHEC)]
   )
 
 # --- Combine ---
@@ -587,7 +588,7 @@ fam_counts_only <- df %>%
   group_by(life_cycle_group, variable) %>%
   summarise(count_1 = n(), .groups = "drop") %>%
   # Rename variable to neat label
-  mutate(variable = recode(variable,
+  mutate(variable = dplyr::recode(variable,
                            CFFAMILY = "Help from family")) %>%
   filter(count_1 > 0) %>%
   # Calculate percentages (relative to the total count for Help from family)
@@ -604,7 +605,7 @@ em_counts_only <- df %>%
   group_by(life_cycle_group, variable) %>%
   summarise(count_1 = n(), .groups = "drop") %>%
   # Rename variable to neat label
-  mutate(variable = recode(variable,
+  mutate(variable = dplyr::recode(variable,
                            EMERGMON = "Emergency money")) %>%
   filter(count_1 > 0) %>%
   # Calculate percentages (relative to the total count for Emergency money)
@@ -672,6 +673,9 @@ print(plot_fam_interactive)
 
 explore2019<- svy_afford_2019 %>%
   select(
+    weekly_housing_cost    = HCOSTSH,
+    weekly_income          = hh_income_from_ius,
+    HousingCostRatio_Range = weekly_housing_cost_cat,
     Life_Cycle_Group       = life_cycle_group, 
     Household_Size         = PERSHBC,
     Affordability_Ratio    = afford_ratio,
@@ -692,51 +696,76 @@ explore2019<- svy_afford_2019 %>%
     #convert into factor vars
     State = as.factor(State),
     Tenure_type = as.factor(Tenure_type),
-    Education_Level = as.factor(Education_Level
-))
+    Education_Level = as.factor(Education_Level),
+    # Recode Weekly housing cost ratio variable:
+    # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
+    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
     
   
   
 ```
 
-```{r}
-GGally::ggpairs(explore2019)
-```
+
 
 ```{r}
-# fit a linear regression
-model <- lm(Affordability_Ratio ~ Life_Cycle_Group + Household_Size + 
+
+
+model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling,
-                   data = explore2019)
-
-
+                     Purchase_price_dwelling + weekly_housing_cost + weekly_income,  
+                       data = explore2019,
+                       family = binomial(link = "logit")) %>% 
+  step(trace=FALSE)
 summary(model)
-
 car::vif(model)
 ```
 
 ```{r}
-# add 2 way ineractions
-model2 <- lm(Affordability_Ratio ~ (Life_Cycle_Group + Household_Size + 
+model2 <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling)^2,
-                   data = explore2019) %>%
-          step(trace=FALSE)
-
-
+                     Purchase_price_dwelling + weekly_housing_cost * weekly_income,  
+                       data = explore2019,
+                       family = binomial(link = "logit")) %>% 
+  step(trace=FALSE)
 summary(model2)
-
 car::vif(model2)
 ```
+The main predictors are:
+
+weekly_housing_cost ↑ → higher stress
+
+weekly_income ↑ → lower stress
+
+weekly_housing_cost × weekly_income → the effect of cost depends on income level (interaction)
+
+Tenure_type and Purchase_price_dwelling also matter.
+
+Interaction interpretation:
+
+For low-income households, rising housing costs rapidly increase stress.
+
+For high-income households, that effect is smaller — they can absorb higher costs.
+
+```{r}
+#deviance test
+anova(model, test="Chisq")
+drop1(model, test="Chisq")
+
+anova(model2, test="Chisq")
+drop1(model2, test="Chisq")
+
+anova(model, model2, test="Chisq")
+```
+
 
 ```{r}
 AIC(model, model2)
 ```
 
-
 ```{r}
-aug <- augment(model)
+#Diagnostics 
+
+aug <- augment(model2)
 ggplot(aug, aes(x=.fitted, y=.resid)) +
 geom_point() + geom_smooth()
 
