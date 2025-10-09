@@ -718,15 +718,16 @@ car::vif(model)
 
 ```{r}
 # add 2 way ineractions
-model <- lm(Affordability_Ratio ~ Life_Cycle_Group + Household_Size + 
+model2 <- lm(Affordability_Ratio ~ (Life_Cycle_Group + Household_Size + 
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling,
-                   data = explore2019)
+                     Purchase_price_dwelling)^2,
+                   data = explore2019) %>%
+          step(trace=FALSE)
 
 
-summary(model)
+summary(model2)
 
-car::vif(model)
+car::vif(model2)
 ```
 
 ```{r}
