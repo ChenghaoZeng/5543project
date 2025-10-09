@@ -851,11 +851,11 @@ AIC(model, model2)
 ```{r}
 #Diagnostics 
 
-aug <- augment(model2)
-ggplot(aug, aes(x=.fitted, y=.resid)) +
-geom_point() + geom_smooth()
-
-ggplot(aug, aes(sample=.resid)) +
- geom_qq()
+# aug <- augment(model2)
+# ggplot(aug, aes(x=.fitted, y=.resid)) +
+# geom_point() + geom_smooth()
+# 
+# ggplot(aug, aes(sample=.resid)) +
+#  geom_qq()
 ```
 
