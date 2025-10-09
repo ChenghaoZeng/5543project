@@ -23,6 +23,10 @@ library(nnet)
 library(dplyr)
 library(tidyr)
 library(car)
+library(brglm2)
+library(logistf)
+library(visreg)
+library(broom)
 ```
 
 ```{r}
@@ -663,18 +667,19 @@ print(plot_fam_interactive)
 #Tenure type - HH: TENURECF
 #Age of youngest dependent child in household:	AGEKIDH
 #State or Territory of usual residence 2016: STATEHEC
+#Purchase price of dwelling (for dwellings purchased/built in the previous 3 years):HVALPRIC
 
 
 explore2019<- svy_afford_2019 %>%
   select(
-    HousingCostRatio_Range = weekly_housing_cost_cat,
     Life_Cycle_Group       = life_cycle_group, 
     Household_Size         = PERSHBC,
     Affordability_Ratio    = afford_ratio,
     Education_Level        = LVLEDUA,
     Age_Youngest_Child     = AGEKIDH,
     State                  = STATEHEC,
-    Tenure_type            = TENURECF
+    Tenure_type            = TENURECF,
+    Purchase_price_dwelling= HVALPRIC
   ) %>%
    # Filter out Tenure type == 0 (Not applicable)
   filter(Tenure_type != 0)  %>%
@@ -684,214 +689,36 @@ explore2019<- svy_afford_2019 %>%
       mean(Age_Youngest_Child[Age_Youngest_Child != 999], na.rm = TRUE),
       Age_Youngest_Child
     ),
-    # Recode Weekly housing cost ratio variable:
-    # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
-    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
+    #convert into factor vars
+    State = as.factor(State),
+    Tenure_type = as.factor(Tenure_type),
+    Education_Level = as.factor(Education_Level
+))
     
   
   
 ```
 
 ```{r}
-# Boxplot: Affordability ratio vs housing stress
-ggplot(explore2019, aes(x = factor(HousingStress), y = Affordability_Ratio, fill = factor(HousingStress))) +
-  geom_boxplot() +
-  scale_x_discrete(labels = c("0" = "Not stressed", "1" = "Stressed")) +
-  labs(
-    title = "Affordability Ratio by Housing Stress",
-    x = "Housing Stress",
-    y = "Affordability Ratio"
-  ) +
-  theme_minimal()
+GGally::ggpairs(explore2019)
+```
 
-#Summary Statistics Table
-explore2019 %>%
-  group_by(HousingStress) %>%
-  summarise(
-    mean_afford = mean(Affordability_Ratio, na.rm = TRUE),
-    median_afford = median(Affordability_Ratio, na.rm = TRUE),
-    mean_child_age = mean(Age_Youngest_Child, na.rm = TRUE)
-  )
-#t-test (for 2 groups)
-t.test(Affordability_Ratio ~ HousingStress, data = explore2019)
+```{r}
 
 ```
 
 
 ```{r}
-# proportion bar chart: Household size vs housing stress
-explore2019 %>%
-  group_by(Household_Size, HousingStress) %>%
-  summarise(n = n()) %>%
-  mutate(prop = n / sum(n)) %>%
-  ggplot(aes(x = factor(Household_Size), y = prop, fill = factor(HousingStress))) +
-  geom_col(position = "fill") +
-  labs(
-    title = "Proportion of Households Experiencing Housing Stress by Household Size",
-    x = "Household Size (number of people)",
-    y = "Proportion",
-    fill = "Housing Stress"
-  ) +
-  scale_fill_manual(values = c("#74add1", "#f46d43"),
-                    labels = c("Not stressed", "Stressed")) +
-  theme_minimal()
-
-
-#t-test (for 2 groups)
-t.test(Household_Size ~ HousingStress, data = explore2019)
+AIC(model, model2)
 ```
-```{r}
-# Boxplot: Age of youngest child vs housing stress
-ggplot(explore2019, aes(x = factor(HousingStress), y = Age_Youngest_Child, fill = factor(HousingStress))) +
-  geom_boxplot() +
-  labs(
-    title = "Age of Youngest Dependent Child by Housing Stress",
-    x = "Housing Stress",
-    y = "Age of Youngest Child (years)"
-  ) +
-  theme_minimal()
 
-#t-test (for 2 groups)
-t.test(Age_Youngest_Child ~ HousingStress, data = explore2019)
-```
 
 ```{r}
-ggplot(explore2019, aes(x = factor(Education_Level), fill = factor(HousingStress))) +
-  geom_bar(position = "fill") +
-  labs(
-    title = "Proportion of Households Experiencing Housing Stress by Education Level",
-    x = "Education Level",
-    y = "Proportion within Education Level",
-    fill = "Housing Stress"
-  ) +
-  scale_fill_manual(
-    values = c("#74add1", "#f46d43"),
-    labels = c("0" = "Not stressed", "1" = "Stressed")
-  ) +
-  scale_x_discrete(labels =c(
-  "0" = "Not applicable",
-  "1" = "Postgraduate Degree",
-  "2" = "Graduate Diploma and Graduate Certificate",
-  "3" = "Bachelor Degree",
-  "4" = "Advanced Diploma and Diploma",
-  "5" = "Certificate III and IV",
-  "6" = "Year 12 or equivalent",
-  "7" = "Year 11",
-  "8" = "Year 10",
-  "9" = "Certificate I and II",
-  "10" = "Year 9 and below",
-  "11" = "Certificate n.f.d.",
-  "12" = "Level not determined (non-school only)")) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
+aug <- augment(model)
+ggplot(aug, aes(x=.fitted, y=.resid)) +
+geom_point() + geom_smooth()
 
-
-#t-test (for 2 groups)
-t.test( Education_Level ~ HousingStress, data = explore2019)
+ggplot(aug, aes(sample=.resid)) +
+ geom_qq()
 ```
 
-```{r}
-ggplot(explore2019, aes(x = factor(Tenure_type), fill = factor(HousingStress))) +
-  geom_bar(position = "fill") +
-  labs(
-    title = "Proportion of Households Experiencing Housing Stress by Tenure Type",
-    x = "Tenure Type",
-    y = "Proportion within Tenure Type",
-    fill = "Housing Stress"
-  ) +
-  scale_fill_manual(
-    values = c("#74add1", "#f46d43"),
-    labels = c("0" = "Not stressed", "1" = "Stressed")
-  ) +
-  scale_x_discrete(
-    labels = c(
-      "1" = "Owner (no mortgage)",
-      "2" = "Owner (with mortgage)",
-      "3" = "Renter",
-      "4" = "Other"
-    )
-  ) +
-  theme_minimal()
-
-
-#t-test (for 2 groups)
-t.test( Tenure_type ~ HousingStress, data = explore2019)
-```
-
-```{r}
-# Create a named vector for state labels
-state_labels <- c(
-  "1" = "New South Wales",
-  "2" = "Victoria",
-  "3" = "Queensland",
-  "4" = "South Australia",
-  "5" = "Western Australia",
-  "6" = "Tasmania",
-  "7" = "Northern Territory",
-  "8" = "Australian Capital Territory"
-)
-
-# Plot proportion of housing stress by state
-ggplot(explore2019, aes(x = factor(State), fill = factor(HousingStress))) +
-  geom_bar(position = "fill") +
-  labs(
-    title = "Proportion of Households Experiencing Housing Stress by State",
-    x = "State",
-    y = "Proportion within State",
-    fill = "Housing Stress"
-  ) +
-  scale_fill_manual(
-    values = c("#74add1", "#f46d43"),
-    labels = c("0" = "Not stressed", "1" = "Stressed")
-  ) +
-  scale_x_discrete(labels = state_labels) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-
-#t-test (for 2 groups)
-t.test( State ~ HousingStress, data = explore2019)
-```
-
-```{r}
-explore2019 <- explore2019 %>%
-  mutate(
-    State = as.factor(State),
-    Tenure_type = as.factor(Tenure_type),
-    Education_Level = as.factor(Education_Level)
-  )
-# Fit logistic regression
-model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
-                Affordability_Ratio + Education_Level + 
-                Age_Youngest_Child + State + Tenure_type,
-              data = explore2019,
-                family = binomial(link = "logit"))
-
-summary(model)
-
-```
-
-```{r}
-car::vif(model)
-```
-
-```{r}
-# Interaction between Affordability_Ratio and Education_Level
-model2 <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
-                Affordability_Ratio*Education_Level + 
-                Age_Youngest_Child + State + Tenure_type,
-              data = explore2019,
-              family = binomial(link = "logit"))
-
-summary(model2)
-
-vif(model2)
-```
-
-```{r}
-#test If the interaction isn’t significant
-anova(model, model2, test = "Chisq")
-```
