@@ -878,3 +878,20 @@ summary(model)
 car::vif(model)
 ```
 
+```{r}
+# Interaction between Affordability_Ratio and Education_Level
+model2 <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
+                Affordability_Ratio*Education_Level + 
+                Age_Youngest_Child + State + Tenure_type,
+              data = explore2019,
+              family = binomial(link = "logit"))
+
+summary(model2)
+
+vif(model2)
+```
+
+```{r}
+#test If the interaction isn’t significant
+anova(model, model2, test = "Chisq")
+```
