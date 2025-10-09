@@ -704,9 +704,30 @@ GGally::ggpairs(explore2019)
 ```
 
 ```{r}
+# fit a linear regression
+model <- lm(Affordability_Ratio ~ Life_Cycle_Group + Household_Size + 
+                     Education_Level + Age_Youngest_Child + State + Tenure_type + 
+                     Purchase_price_dwelling,
+                   data = explore2019)
 
+
+summary(model)
+
+car::vif(model)
 ```
 
+```{r}
+# add 2 way ineractions
+model <- lm(Affordability_Ratio ~ Life_Cycle_Group + Household_Size + 
+                     Education_Level + Age_Youngest_Child + State + Tenure_type + 
+                     Purchase_price_dwelling,
+                   data = explore2019)
+
+
+summary(model)
+
+car::vif(model)
+```
 
 ```{r}
 AIC(model, model2)
