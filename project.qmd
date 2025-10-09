@@ -264,16 +264,36 @@ stress_by_life <- hh_svy %>%
 stress_by_life %>% collect() %>% print(n = Inf)
 
 
-#Mean weekly housing cost % by life-cycle group
-mean_cost_by_life <- hh_svy %>%
+# Proportion of households in housing stress (>20%) by life-cycle group
+stress_by_life_20 <- hh_svy %>%
   group_by(life_cycle_group) %>%
   summarize(
-    mean_hc_pct = survey_mean(weekly_housing_cost_pct, vartype = c("ci","se"), na.rm = TRUE)
+    pct_stress = survey_mean(housing_stress_flag_20, vartype = c("ci","se"), na.rm = TRUE)
   ) %>%
-  arrange(desc(mean_hc_pct))
+  arrange(desc(pct_stress))
 
-mean_cost_by_life %>% collect() %>% print(n = Inf)
+stress_by_life_20 %>% collect() %>% print(n = Inf)
 
+
+# Proportion of households in housing stress (>40%) by life-cycle group
+stress_by_life_40 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag_40, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life_40 %>% collect() %>% print(n = Inf)
+
+# Proportion of households in housing stress (>50%) by life-cycle group
+stress_by_life_50 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag_50, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life_50 %>% collect() %>% print(n = Inf)
 ```
 
 
@@ -307,36 +327,87 @@ p1 <- ggplot(plot1_df, aes(x = life_cycle_group, y = pct)) +
 ggsave("plot_housing_stress_by_lifecycle.png", p1, width = 10, height = 6, dpi = 300)
 
 
-plot2_df <- mean_cost_by_life %>%
+plot2_df <- stress_by_life_20 %>%
   collect() %>%
   mutate(
-    mean_pct = mean_hc_pct * 1,
-    low = mean_hc_pct_low * 1,
-    up = mean_hc_pct_upp * 1
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
   ) %>%
-  arrange(mean_pct) %>%
+  arrange(pct) %>%
   mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
 
-p2 <- ggplot(plot2_df, aes(x = life_cycle_group, y = mean_pct)) +
+p2 <- ggplot(plot2_df, aes(x = life_cycle_group, y = pct)) +
   geom_col() +
   geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
   coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
   labs(
-    title = "Mean Weekly Housing Cost (% of gross household income) by Life-cycle group",
+    title = "Proportion of Households in Housing Stress (>20% housing costs)",
     x = "Life-cycle group",
-    y = "Mean weekly housing cost (%) (weighted, 95% CI)"
+    y = "Percent of households (weighted, 95% CI)"
   ) +
   theme_minimal(base_size = 12) +
   theme(
     plot.title = element_text(size = 10)   
   )
 
-# Save plot
-ggsave("plot_mean_housing_cost_by_lifecycle.png", p2, width = 10, height = 6, dpi = 300)
+plot3_df <- stress_by_life_40 %>%
+  collect() %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
+  ) %>%
+  arrange(pct) %>%
+  mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
+
+p3 <- ggplot(plot3_df, aes(x = life_cycle_group, y = pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>40% housing costs)",
+    x = "Life-cycle group",
+    y = "Percent of households (weighted, 95% CI)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 10)   
+  )
+
+
+plot4_df <- stress_by_life_50 %>%
+  collect() %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
+  ) %>%
+  arrange(pct) %>%
+  mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
+
+p4 <- ggplot(plot4_df, aes(x = life_cycle_group, y = pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>50% housing costs)",
+    x = "Life-cycle group",
+    y = "Percent of households (weighted, 95% CI)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 10)   
+  )
 
 # Print to the HTML output
-p1
-p2
+ggplotly(p1)
+ggplotly(p2)
+ggplotly(p3)
+ggplotly(p4)
 
 ```
 
