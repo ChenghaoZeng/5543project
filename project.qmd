@@ -251,6 +251,18 @@ hh_svy2013 <- hh_merged2013 %>%
 
 ```
 
+```{r}
+
+# Proportion of households in housing stress (>30%) by sex group 
+stress_by_life <- hh_svy %>%
+  group_by(SEXRH) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life %>% collect() %>% print(n = Inf)
+```
 
 ```{r}
 # Proportion of households in housing stress (>30%) by life-cycle group
@@ -745,6 +757,9 @@ print(plot_em_interactive)
 # 3. Print the Help from Family interactive plot
 print(plot_fam_interactive)
 ```
+
+
+
 
 
 ```{r}
