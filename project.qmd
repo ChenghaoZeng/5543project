@@ -934,17 +934,6 @@ summary(model)
 car::vif(model)
 ```
 
-```{r}
-model2 <- glm(HousingStress ~ Tenure_type + Affordability_Ratio+ Household_Size + Age_Youngest_Child + 
-                     Education_Level + State + Life_Cycle_Group + 
-                     Purchase_price_dwelling + sex_group + hh_total_weekly_repayments,  
-                       data = explore2019_imputed,
-                       family = binomial(link = "logit")) %>% 
-  step(trace=FALSE)
-summary(model2)
-car::vif(model2)
-```
-
 The main predictors are:
 
 weekly_housing_cost ↑ → higher stress
@@ -966,13 +955,13 @@ For high-income households, that effect is smaller — they can absorb higher co
 anova(model, test="Chisq")
 drop1(model, test="Chisq")
 
-anova(model2, test="Chisq")
-drop1(model2, test="Chisq")
+# anova(model2, test="Chisq")
+# drop1(model2, test="Chisq")
 ```
 
 
 ```{r}
-AIC(model, model2)
+AIC(model)
 ```
 
 ```{r}
