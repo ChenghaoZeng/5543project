@@ -27,6 +27,7 @@ library(brglm2)
 library(logistf)
 library(visreg)
 library(broom)
+library(mice)
 ```
 
 ```{r}
@@ -863,11 +864,12 @@ print(plot_fam_interactive)
 #sex_group
 #hh_total_weekly_repayments
 
+set.seed(123)
 
 explore2019<- svy_afford_2019 %>%
   select(
-    weekly_housing_cost    = HCOSTSH,
-    weekly_income          = hh_income_from_ius,
+#    weekly_housing_cost    = HCOSTSH,
+#    weekly_income          = hh_income_from_ius,
     HousingCostRatio_Range = weekly_housing_cost_cat,
     Life_Cycle_Group       = life_cycle_group, 
     Household_Size         = PERSHBC,
@@ -896,8 +898,14 @@ explore2019<- svy_afford_2019 %>%
     # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
     HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
     
-  
-  
+
+# check missingness
+na_counts <- explore2019 %>%
+  summarise(
+    across(everything(), ~ sum(is.na(.)))  # 对所有变量，计算NA的数量
+  )
+t(na_counts)
+
 ```
 
 
