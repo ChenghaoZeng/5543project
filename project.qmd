@@ -906,6 +906,17 @@ na_counts <- explore2019 %>%
   )
 t(na_counts)
 
+explore2019_df <- as.data.frame(explore2019)
+
+imputed_data <- mice(
+  data = explore2019_df,
+  m = 5,  
+  maxit = 50,
+  method = "pmm",  #use prediction mean match
+  printFlag = FALSE
+)
+
+explore2019_imputed <- complete(imputed_data, action = 1)
 ```
 
 
@@ -916,7 +927,7 @@ t(na_counts)
 model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
                      Purchase_price_dwelling + Affordability_Ratio + sex_group + hh_total_weekly_repayments,  
-                       data = explore2019,
+                       data = explore2019_imputed,
                        family = binomial(link = "logit")) %>% 
   step(trace=FALSE)
 summary(model)
@@ -924,15 +935,16 @@ car::vif(model)
 ```
 
 ```{r}
-model2 <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
-                     Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling + weekly_housing_cost * weekly_income,  
-                       data = explore2019,
+model2 <- glm(HousingStress ~ Tenure_type + Affordability_Ratio+ Household_Size + Age_Youngest_Child + 
+                     Education_Level + State + Life_Cycle_Group + 
+                     Purchase_price_dwelling + sex_group + hh_total_weekly_repayments,  
+                       data = explore2019_imputed,
                        family = binomial(link = "logit")) %>% 
   step(trace=FALSE)
 summary(model2)
 car::vif(model2)
 ```
+
 The main predictors are:
 
 weekly_housing_cost ↑ → higher stress
@@ -956,8 +968,6 @@ drop1(model, test="Chisq")
 
 anova(model2, test="Chisq")
 drop1(model2, test="Chisq")
-
-anova(model, model2, test="Chisq")
 ```
 
 
