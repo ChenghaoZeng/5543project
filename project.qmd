@@ -860,6 +860,8 @@ print(plot_fam_interactive)
 #Age of youngest dependent child in household:	AGEKIDH
 #State or Territory of usual residence 2016: STATEHEC
 #Purchase price of dwelling (for dwellings purchased/built in the previous 3 years):HVALPRIC
+#sex_group
+#hh_total_weekly_repayments
 
 
 explore2019<- svy_afford_2019 %>%
@@ -874,7 +876,9 @@ explore2019<- svy_afford_2019 %>%
     Age_Youngest_Child     = AGEKIDH,
     State                  = STATEHEC,
     Tenure_type            = TENURECF,
-    Purchase_price_dwelling= HVALPRIC
+    Purchase_price_dwelling= HVALPRIC,
+    sex_group,
+    hh_total_weekly_repayments
   ) %>%
    # Filter out Tenure type == 0 (Not applicable)
   filter(Tenure_type != 0)  %>%
@@ -903,7 +907,7 @@ explore2019<- svy_afford_2019 %>%
 
 model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling + weekly_housing_cost + weekly_income,  
+                     Purchase_price_dwelling + Affordability_Ratio + sex_group + hh_total_weekly_repayments,  
                        data = explore2019,
                        family = binomial(link = "logit")) %>% 
   step(trace=FALSE)
