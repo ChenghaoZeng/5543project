@@ -713,13 +713,7 @@ While **HDI** takes into account other factors of well being like income, health
 + It does not take into account other factors of social welfare like freedom, generosity, gender inequality, etc.
 + It is more quantitative than qualitative. It may not necessarily address the nuances of human development like human rights and quality of life rather than life expectancy.
 
-#### World Happiness Report
 
-**World Happiness Report** has its own limitations:
-
-+ Subjective: It addresses self-reported scores which can be influenced by various other social factors than the ones they have taken into account. It has social bias and different interpretations of the same factor
-+ Limited factors are taken into consideration apart from the ones mentioned above. 
-+ Cultural differences: Different societies may have different definitions of social factors used for measuring happiness. The score does not take into account the social and cultural factors affecting happiness.
 
 # References
 
