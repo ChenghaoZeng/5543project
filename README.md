@@ -3,11 +3,7 @@ To access the microdata from the Australian Bureau of Statistics (ABS), go to ht
 
 1: Income and Housing, 2019–20
 
-2: Income and Housing, 2017–18
-
-3: Household Expenditure, Income and Housing, 2015–16
-
-4: Income and Housing, 2013–14
+2: Income and Housing, 2013–14
 
 Please note that you will need to sign in using an authorised organisational account (e.g. a Monash University account) to access the microdata.
 
