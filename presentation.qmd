@@ -344,7 +344,7 @@ svy_afford_2013 <- hh_svy2013 %>%
 summary2013 <- svy_afford_2013 %>%
   group_by(sex_group) %>%
   summarise(
-    pct_stress = survey_mean(housing_stress, vartype = c("ci", "se"), na.rm = TRUE)
+    pct_stress = survey_mean(housing_stress, na.rm = TRUE)
   ) %>%
   mutate(year = 2013) %>%
   ungroup()
@@ -369,7 +369,7 @@ svy_afford_2019 <- hh_svy %>%
 summary2019 <- svy_afford_2019 %>%
   group_by(sex_group) %>%
   summarise(
-    pct_stress = survey_mean(housing_stress, vartype = c("ci", "se"), na.rm = TRUE)
+    pct_stress = survey_mean(housing_stress, na.rm = TRUE)
   ) %>%
   mutate(year = 2019) %>%
   ungroup()
@@ -377,9 +377,7 @@ summary2019 <- svy_afford_2019 %>%
 # --- Combine both years ---
 summary_combined <- bind_rows(summary2013, summary2019) %>%
   mutate(
-    pct = pct_stress * 100,
-    low = pct_stress_low * 100,
-    up = pct_stress_upp * 100
+    pct = pct_stress * 100
   )
 
 # --- Visualization ---
@@ -389,19 +387,13 @@ p_stress <- ggplot(summary_combined, aes(
   fill = factor(year)
 )) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "white") +
-  geom_errorbar(
-    aes(ymin = low, ymax = up),
-    width = 0.2,
-    position = position_dodge(width = 0.8),
-    color = "black"
-  ) +
   scale_fill_manual(values = c("#4E79A7", "#F28E2B")) +
   scale_y_continuous(labels = function(x) paste0(x, "%"), expand = c(0, 0)) +
   labs(
     title = "Proportion of Households in Housing Stress (>30% of Income)",
     subtitle = "By Sex Group (Comparison: 2013 vs 2019)",
     x = "Sex group",
-    y = "Percent of households (weighted, 95% CI)",
+    y = "Percent of households",
     fill = "Year",
     caption = "Source: Household Survey Data"
   ) +
@@ -530,17 +522,25 @@ print(plot_fam_interactive)
 
 - Propose evidence-based policy directions for the future
 
+- Further improvment for this project
+
 
 
 ## What is Housing Stress?
 
-![](plot_housing_stress_by_lifecycle.png){fig-align="center" }
+- Defined as spending **>30% of household weekly income on weekly housing costs**  
+- reflects **financial vulnerability**  
+
+[ABC News (2024)](https://www.abc.net.au/news/2024-05-15/federal-budget-housing-crisis-in-10-graphs/103847336): Rising housing stress in Australia since 2000s.
+
 
 
 
 
 
 ## Housing Burden by Life-Cycle Group (2013 vs 2019)
+
+
 ```{r}
 ggplotly(p)
 ```
@@ -561,50 +561,68 @@ ggplotly(p_stress, tooltip = c("x", "fill", "y"))
 
 
 ## Model Setup Preview: 
-- **Dependent Variable**: Whether a household faces housing stress (binary: Yes/No)  
-- **Independent Variables**:  
-  - Life cycle stage  
-  - Education level  
-  - State (regional location)  
-  - Tenure type (e.g., rental, social housing)  
-  - Affordability ratio  
-  - Household size  
+
+$$
+\text{logit}\big(P(\text{HousingStress} = 1)\big) = \\
+\beta_0 
++ \beta_1 \cdot \text{Life_Cycle_Group} 
++ \beta_2 \cdot \text{Household_Size} \\
++ \beta_3 \cdot \text{Education_Level} 
++ \beta_4 \cdot \text{Age_Youngest_Child} \\
++ \beta_5 \cdot \text{State} 
++ \beta_6 \cdot \text{Tenure_type} 
++ \beta_7 \cdot \text{Purchase_price_dwelling}  \\ 
++ \beta_8 \cdot \text{sex_group} 
++ \beta_{10} \cdot \text{hh_total_weekly_repayments}\\
+$$
 
 
 
 ## Key Predictor Interpretations 
 
-1. Household Size:  
-Larger households reduce housing stress (1-person increase → ~18% lower odds).
+1. <span style="color:#2E86C1;"><b>Household Size</b></span>:  
+Larger households reduce housing stress  (<span style="color:#2E86C1;"><b>1</b></span>-person increase → ~ <span style="color:#2E86C1;"><b>1.8%</b></span> lower odds).
 
-2. Age of Youngest Child:  
-Slight trend: older children may slightly lower stress.
+2. <span style="color:#2E86C1;"><b>Age of Youngest Child</b></span>:  
+Older children may slightly lower stress (<span style="color:#2E86C1;"><b>1</b></span> year older → ~<span style="color:#2E86C1;"><b>1.2%</b></span> lower odds).
+
+3. <span style="color:#2E86C1;"><b>Purchase Price of Dwelling</b></span>:
+Higher dwelling purchase price increase stress  (<span style="color:#2E86C1;"><b>$100,000</b></span> increase → ~<span style="color:#2E86C1;"><b>1.3%</b></span> higher odds).
+
+4. <span style="color:#2E86C1;"><b>Tenure Type</b></span>:
+Compared to owners with no mortgage —
+-  Owners with mortgage: ~<span style="color:#2E86C1;"><b>6%</b></span> higher odds of stress.
+-  Pivate renters: ~ <span style="color:#2E86C1;"><b>2.1%</b></span> higher odds of stress.
 
 
-3. Purchase Price of Dwelling:
-Original purchase price not a key driver; ongoing affordability matters.
 
-4. Affordability Ratio:
-Strongest predictor; higher share of income spent on housing → much higher stress.
+## Conclusion and Recommendations:
+
+<span style="color:#2E86C1;"><b>Conclusion</b></span>:
+
+Lone person under 35, families with dependents, and females remain most vulnerable due to rising housing costs and limited financial buffers.
 
 
-## Recommendations:
+<span style="color:#2E86C1;"><b>Recommendations</b></span>:
 
-- 1. Expand Social & Affordable Housing  
+1. Expand Social & Affordable Housing  
 
-- 2. Targeted Financial Assistance  
+- provide more social housing that are affordable to young adults. 
 
-- 3. Address Regional Disparities  
+2. Targeted Financial Assistance  
+
+- focus on groups most exposed to housing cost burdens.
+
 
 
 ## Limitations & Future Directions
 
-Current Limitation  
+<span style="color:#2E86C1;"><b>Current Limitation </b></span>
 
 - Data cutoff: 2019 (pre-COVID-19)  
 - Missing post-2020 changes: Interest rate hikes, rent surges, living cost increases  
 
-Future Work Plan  
+<span style="color:#2E86C1;"><b>Future Work Plan</b></span>  
 
 - Update analysis with 2020+ data to track post-pandemic trends  
 - Add new variables: Remote work impact, interest rate fluctuations
