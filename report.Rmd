@@ -40,7 +40,11 @@ library(mice)
 
 # Git Repo Link: https://github.com/ChenghaoZeng/5543project/tree/main
 
-#
+# Abstract
+
+
+This report examines the evolving patterns of housing stress in Australia between 2013 and 2019, identifying the most vulnerable demographic groups and exploring the key factors that drive financial strain related to housing costs. Using national household survey data, the study applies both descriptive and inferential analysis — including logistic regression — to reveal structural inequalities that contribute to housing stress. Key findings indicate that lone-person households under 35, single-parent families, and female-headed households remain consistently at higher risk. The study also highlights how factors such as tenure type, purchase price, and household size significantly influence the likelihood of housing stress. The insights generated aim to inform policymakers and contribute to discussions on targeted housing affordability interventions.
+
 
 # Background of Organisation and Scope of Work within Internship : 
 
