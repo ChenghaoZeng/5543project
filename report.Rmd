@@ -42,26 +42,56 @@ library(mice)
 
 # Abstract
 
-
 This report examines the evolving patterns of housing stress in Australia between 2013 and 2019, identifying the most vulnerable demographic groups and exploring the key factors that drive financial strain related to housing costs. Using national household survey data, the study applies both descriptive and inferential analysis — including logistic regression — to reveal structural inequalities that contribute to housing stress. Key findings indicate that lone-person households under 35, single-parent families, and female-headed households remain consistently at higher risk. The study also highlights how factors such as tenure type, purchase price, and household size significantly influence the likelihood of housing stress. The insights generated aim to inform policymakers and contribute to discussions on targeted housing affordability interventions.
 
 
-# Background of Organisation and Scope of Work within Internship : 
+# Introduction
 
-360info is an open-access global information agency that addresses the world's biggest challenges and offers practical and research-based solutions. It is a digital wire which publishes and broadcasts its content under the  Creative Commons 4.0 license which is very flexible in terms of publishing academic content. 
+Housing affordability has become one of the most pressing social and economic challenges in Australia. The growing mismatch between housing supply and population growth has placed considerable pressure on both renters and prospective homeowners. The concept of housing stress — commonly defined as households spending more than 30% of their gross income on housing costs — has become a widely used indicator of financial vulnerability (ABC News, Hutchens, 2024).
 
-Each week there is a Special Report wherein 5-10 articles are published addressing a key problem existing globally. The article would majorly focus on Asia Pacific region. The report is data analysis driven supported with graphics and data visualizations and other interactives. 
+The purpose of this report is to explore how housing stress has evolved over time, to identify which groups are most affected, and to uncover the underlying drivers of this financial burden. The analysis also aims to create accessible and interpretable visual tools that can communicate findings effectively to policymakers and the public.
 
-Our scope of work was defined but not limited to the below:
+This work was conducted as part of an internship project at the Australian Institute of Family Studies, focusing on translating analytical evidence into policy-relevant insights.
 
-+ Exploratory data analysis: We discuss with the editors and understand the key problem and the aim of the report. We would research articles and licensed datasets(for further reproducibility) and conduct exploratory data analysis on the shortlisted datasets.  
-+ Data Wrangling support: Few datasets are in ready-to-use formats while most datasets need tidying or combining two or more datasets for use in graphics. This is done after finalising the datasets and visualisation with the editors. 
-+ Graphics: The idea behind a visualisation is to build something that is easy to understand and consistent with traditional graphics and is meaningful for the reader that can be related to the key problem. Our first draft of graphics consists of multiple trial and errors post in which we finalise the potential visualisations with our team and supervisor and undergo multiple reiterations to finalise a visualization that is ready to publish. 
 
-During the internship I have had the opportunity to work on two key global issues: 
+# Background and Motivation : 
 
-+ Child Marriage during Covid-19 
-+ Economics of Well Being
+Australia’s housing landscape has experienced significant shifts over the past two decades. Escalating property prices, limited housing supply, and slow wage growth have created conditions where many households — particularly those with children or on lower incomes — struggle to meet housing costs.
+
+According to the 2024 ABC News report, housing stress has “risen sharply since the early 2000s,” with more Australians spending disproportionate amounts of income on housing (Hutchens, 2024). This trend has profound implications for family wellbeing, social inclusion, and economic stability.
+
+Beyond simple affordability concerns, housing stress affects family functioning, mental health, and intergenerational mobility. Families under persistent housing stress are more likely to face financial insecurity, relationship strain, and poorer health outcomes. These consequences make housing stress not merely an economic issue, but a broader social and policy challenge.
+
+The motivation for this study arises from these concerns. By analysing national household survey data across multiple years, this project aims to clarify which groups face the highest burden and why — thereby helping to inform future housing and welfare policy.
+
+# Objectives and Significance
+
+The analysis has four main objectives:
+
+1: To describe how housing stress levels have changed over time (2013–2019).
+
+2: To identify which demographic and household groups are most at risk.
+
+3: To model key drivers — such as household structure, education, tenure type, and financial variables — that explain housing stress.
+
+4: To translate findings into practical, policy-relevant insights.
+
+This study was undertaken as part of my internship at the Australian Institute of Family Studies (AIFS), an independent statutory agency of the Australian Government within the Department of Social Services. AIFS conducts high-quality research to increase understanding of the factors that affect family wellbeing and to inform government policy and service delivery. Its work covers diverse areas such as family relationships, housing and financial security, child wellbeing, and social inclusion.
+
+As an intern analyst at AIFS, my role focused on using data-driven methods to explore issues affecting Australian families, particularly in relation to housing affordability and economic stress. This project was designed not only as an academic exercise but as a practical contribution to AIFS’s mission of supporting evidence-based policy.
+
+The analysis contributes to this broader goal by producing reproducible, interpretable, and visually engaging insights that can be shared with policymakers, researchers, and the public.
+
+The significance of this study lies in its combination of statistical modelling and visual storytelling. By blending quantitative rigour with clear, visual communication, the analysis aims to:
+
++ Enhance understanding of complex affordability dynamics among different population groups,
+
++ Inform evidence-based decision making on housing and social welfare policy, and
+
++ Provide an analytical framework that can be extended with future data — for example, to assess housing stress patterns in the post-COVID period.
+
+Ultimately, this project bridges the gap between academic research and policy application, demonstrating how analytical insights can be translated into meaningful recommendations that improve family and community wellbeing across Australia.
+
 
 # Topic 1: Child Marriage during Covid-19 
 
