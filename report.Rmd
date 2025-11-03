@@ -95,7 +95,7 @@ Ultimately, this project bridges the gap between academic research and policy ap
 
 # Topic 1: Child Marriage during Covid-19 
 
-## Aim 
+## 
 The aim of this key problem is to understand the global impact that Covid-19 had globally due to various factors and what are the legal policies globally regarding child marriage.
 
 ## Background
