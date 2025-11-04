@@ -244,23 +244,22 @@ The main limitation of this analysis is the data coverage period, which ends in 
 
 Future extensions will include:
 
-Updating the analysis with post-2020 data to assess pandemic-era impacts;
++ Updating the analysis with post-2020 data to assess pandemic-era impacts;
 
-Integrating regional housing market data to explore spatial inequalities; and
++ Integrating regional housing market data to explore spatial inequalities; and
 
-Considering dynamic models (e.g., mixed effects) to account for household-level variation over time.
++ Considering dynamic models (e.g., mixed effects) to account for household-level variation over time.
 
 This continuation will enable a more complete understanding of housing stress in contemporary Australia.
 
 ## Conclusion 
 
-Out of 41 countries that have high rates of child marriages, 30 countries are in Africa. Data speaks for itself, African countries have the highest rates of child marriages globally and have a poor implementation of child marriage laws despite the prohibition of child marriages in most countries. These girls mostly belong to marginalised families. Most African countries have poor economic conditions and have militarized zones with no access to health, education, and other basic amenities. Most militarized African countries with armed conflicts have high rates of poverty and poor education system which can be attributed to high rates of child marriage. Certain religious and cultural traditions and customs which allow child marriage has been ongoing for decades and are still highly prevalent in the rural areas of African countries. For most families, it is a source of survival. Not only legal but social and economic reforms must also be implemented to ensure that child marriage is not the last option for a family.
-Mozambique has launched an initiative called the “Girls Forum”, which is a platform to empower girls, learn about society, understand the institution of marriage, and sexual and reproductive health, and improve their decision-making abilities. 
-The African Union and the End Child Marriage campaign: The aim of this campaign is to end child marriage through the effective implementation of policies, promotion of human rights, spreading more awareness in society through advocacy, and working on removing the barriers to eradicating child marriage.
+This report provides an evidence-based assessment of housing stress trends in Australia, identifying persistent disparities by age, family structure, and gender.
+Despite modest improvements between 2013 and 2019, key groups — notably lone young adults, single parents, and female-headed households — continue to face disproportionate financial burdens.
 
-Bangladesh had the highest child marriage rate amongst all Asian countries and is rated fourth highest globally. In Bangladesh, 59% of girls get married before the age of 18 and this number has only been exponentially increasing ever since the pandemic. The informal sector, which is the main source of livelihood for almost 85 percent of Bangladeshis, was hit badly during Covid-19, leading to poor economic conditions and thereby leading to an increase in the child marriage rate. Also, Covid-19 was a boon for many families who wanted a small wedding with less dowry and expenditure on marriage. In countries, which are more traditional, the price of dowry increases as the girl gets older, hence the parents deem it suitable to marry the girl off at a young age. Proper enforcement of the law is not prevalent in Bangladesh which prohibits child marriage with exceptions in special circumstances which comes under The Amendment of the Child Marriage Restraint Act in 2017. People believe the clause is to underreport the actual rate of child marriage taking place in the country. 
+The modelling results demonstrate that tenure type, household composition, and dwelling costs are among the most critical predictors of stress. These insights underscore the need for targeted housing policies and financial assistance mechanisms that account for structural inequalities.
 
-We can observe that most countries with the highest child marriage rate are in Africa, wherein most countries’ legal policy says that child marriage is prohibited with legal exceptions. The clause for legal exceptions makes it easier to hide the actual figures for child marriage within the country and people have been taking advantage of this flaw for decades. 
+Ultimately, addressing housing stress requires a multi-pronged policy approach — one that not only expands affordable supply but also improves financial resilience among vulnerable households.
 
 
 
