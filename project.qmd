@@ -648,8 +648,6 @@ p <- ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = fac
   )
 
 ggplotly(p)
-
-
 ```
 
 
@@ -943,9 +941,10 @@ model2 <- glm(HousingStress ~ Life_Cycle_Group + Household_Size +
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
                      Purchase_price_dwelling + Affordability_Ratio + sex_group + hh_total_weekly_repayments,  
                        data = explore2019_imputed,
-                       family = binomial(link = "logit")) 
-summary(model2)
-car::vif(model2)
+                       family = binomial(link = "logit")) %>% 
+  step(trace=FALSE)
+summary(model)
+car::vif(model)
 ```
 The main predictors are:
 
