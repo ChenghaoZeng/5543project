@@ -238,17 +238,19 @@ The findings paint a nuanced picture of Australia’s housing stress landscape. 
 
 These patterns suggest that housing stress is both a financial and social phenomenon, embedded in broader structures of inequality.
 
-# Policy Implications
+# Limitations and Future Work
 
-There are 2 key policy directions arise from the findings:
+The main limitation of this analysis is the data coverage period, which ends in 2019 — prior to the COVID-19 pandemic. Housing markets and affordability patterns have changed substantially since then, influenced by rising interest rates, inflation, and shifts in remote work.
 
-+ Expand access to social and affordable housing.
-Governments should increase investment in social and affordable housing, especially for young adults and low-income families. Expanding supply at the lower end of the housing market can help stabilise rents and reduce stress among vulnerable groups.
+Future extensions will include:
 
-+ Target financial assistance for single parents and young renters.
-Since these groups face the highest risk of stress, targeted subsidies, rent relief, or first-home buyer support could help alleviate financial pressure and enhance social equity.
+Updating the analysis with post-2020 data to assess pandemic-era impacts;
 
-Both recommendations align with national priorities to reduce housing inequality and improve financial wellbeing across life stages.
+Integrating regional housing market data to explore spatial inequalities; and
+
+Considering dynamic models (e.g., mixed effects) to account for household-level variation over time.
+
+This continuation will enable a more complete understanding of housing stress in contemporary Australia.
 
 ## Conclusion 
 
