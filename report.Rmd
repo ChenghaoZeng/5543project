@@ -168,7 +168,7 @@ loans_agg2013 <- loans2013 %>%
 
 + na.rm = TRUE prevents missing loan entries from producing NA sums; the semantic meaning of missing values should be assessed (e.g., missing vs no loans).
 
-### Aggregating income-unit / income records to household level
+### 3. Aggregating income-unit / income records to household level
 
 Income records were aggregated by household to create an auxiliary household-level income measure and a count of income units:
 ```{r, eval=FALSE}
@@ -553,5 +553,4 @@ Ooms, J. (2022). gifski: Highest quality GIF encoder. [online] Available at: htt
 + Wickham, H. and Bryan, J. (2023). readxl: Read excel files. [online] Available at: https://cran.r-project.org/package=readxl.
 + Wickham, H., Hester, J. and Bryan, J. (2023). readr: Read rectangular text data. [online] Available at: https://cran.r-project.org/package=readr.
 + Wickham, H., Romain François, Henry, L., Kirill Müller and Vaughan, D. (2023). dplyr: A grammar of data manipulation. [online] Available at: https://cran.r-project.org/package=dplyr.
-+ Wickham, H. and Seidel, D. (2022). scales: Scale functions for visualization. [online] Available at: https://cran.r-project.org/package=scales.
 
