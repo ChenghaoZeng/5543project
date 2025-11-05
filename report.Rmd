@@ -551,5 +551,4 @@ Ooms, J. (2022). gifski: Highest quality GIF encoder. [online] Available at: htt
 + Wickham, H. (2016). ggplot2: Elegant graphics for data analysis. [online] Springer-Verlag New York. Available at: https://ggplot2.tidyverse.org.
 + Wickham, H., Averick, M., Bryan, J., Chang, W., Lucy D'Agostino McGowan, Romain François, Grolemund, G., Hayes, A., Henry, L., Hester, J., Kuhn, M., Thomas Lin Pedersen, Miller, E., Stephan Milton Bache, Kirill Müller, Ooms, J., Robinson, D., Dana Paige Seidel, Vitalie Spinu and Takahashi, K. (2019). Welcome to the tidyverse. Journal of Open Source Software, 4, p.1686. doi:https://doi.org/10.21105/joss.01686.
 + Wickham, H. and Bryan, J. (2023). readxl: Read excel files. [online] Available at: https://cran.r-project.org/package=readxl.
-+ Wickham, H., Hester, J. and Bryan, J. (2023). readr: Read rectangular text data. [online] Available at: https://cran.r-project.org/package=readr.
 
