@@ -272,7 +272,7 @@ hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
 
 ### 7. Recoding life-cycle groups and deriving outcome flags
 
-Numeric life-cycle codes were recoded to descriptive labels. Multiple housing-stress indicators were constructed using different thresholds to support sensitivity analyses:
+Numeric life-cycle codes are recoded to descriptive labels. Multiple housing-stress indicators were constructed using different thresholds to support sensitivity analyses:
 
 ```{r, eval=FALSE}
 hh_merged <- hh_merged %>%
