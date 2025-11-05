@@ -241,7 +241,7 @@ left_join(person_head2013, by = "ABSHID")
 
 ### 6. Variable renaming and harmonisation
 
-A mapping of original variable codes to descriptive names was applied to improve readability and reproducibility. Conditional renaming was used to accommodate differences in variable availability between years.
+A mapping of original variable codes to descriptive names was applied to improve the readability and reproducibility. Conditional renaming was used to accommodate differences in variable availability between years.
 ```{r, eval=FALSE}
 rename_map <- c(
 "SIHHHWT"   = "hh_weight",
