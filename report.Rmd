@@ -92,7 +92,263 @@ The significance of this study lies in its combination of statistical modelling 
 
 Ultimately, this project bridges the gap between academic research and policy application, demonstrating how analytical insights can be translated into meaningful recommendations that improve family and community wellbeing across Australia.
 
+# Methodology
 
+## Data Processing
+
+### Overview
+
+The Statistical Income and Housing (SIH) microdata for 2013 and 2019 were prepared and harmonised into household-level analysis files. The following sections document the steps performed to construct the analysis datasets, the rationale behind key transformations, and important implementation checks. All operations are described in a neutral, reproducible manner and correspond to the R code used in the analysis pipeline.
+
+
+### 1. Loading raw files
+Household-level, person-level, income and loan CSV files were read for both survey years. The files correspond to the SIH file components:
+
++ BH — household-level file
+
++ BP — person-level file
+
++ BI — income (income unit / person) file
+
++ BL — loans / borrowings file
+
+```{r, eval=FALSE}
+#load data
+household <- read_csv("data/CSV/SIH19BH.csv", show_col_types = FALSE)
+income <- read_csv("data/CSV/SIH19BI.csv", show_col_types = FALSE)
+loans <- read_csv("data/CSV/SIH19BL.csv", show_col_types = FALSE)
+person <- read_csv("data/CSV/SIH19BP.csv", show_col_types = FALSE)
+
+#load older data
+household2013 <- read_csv("data/CSV/SIH13BH.csv", show_col_types = FALSE)
+income2013 <- read_csv("data/CSV/SIH13BI.csv", show_col_types = FALSE)
+loans2013 <- read_csv("data/CSV/SIH13BL.csv", show_col_types = FALSE)
+person2013 <- read_csv("data/CSV/SIH13BP.csv", show_col_types = FALSE)
+```
+
++ Reading both 2013 and 2019 prepares the data for direct comparison across years.
+
++ read_csv(..., show_col_types = FALSE) suppresses the printing of column type messages for cleaner logs while preserving column types.
+
+### 2. Aggregating loan records to household level
+
+Loan records are at the loan-level and were aggregated to household totals using the household identifier (ABSHID). The aggregated measures produced are:
+
++ hh_total_weekly_repayments — sum of weekly repayments per household
+
++ hh_total_outstanding — sum of outstanding loan balances per household
+
++ hh_num_loans — number of loan records associated with the household
+
+
+```{r, eval=FALSE}
+#Aggregate loans (household-level debt measures)
+
+loans_agg <- loans %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+
+
+loans_agg2013 <- loans2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+```
+
++ Aggregation converts loan-level detail into household-level covariates suitable for modelling and descriptive statistics.
+
++ na.rm = TRUE prevents missing loan entries from producing NA sums; the semantic meaning of missing values should be assessed (e.g., missing vs no loans).
+
+### Aggregating income-unit / income records to household level
+
+Income records were aggregated by household to create an auxiliary household-level income measure and a count of income units:
+```{r, eval=FALSE}
+iu_agg <- income %>%
+group_by(ABSHID) %>%
+summarise(
+hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+hh_num_ius = n(),
+.groups = "drop"
+)
+
+iu_agg2013 <- income2013 %>%
+group_by(ABSHID) %>%
+summarise(
+hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+hh_num_ius = n(),
+.groups = "drop"
+)
+```
+
++ Summed income from income units provides an independent check against the household income variable in the household file and supports alternative income constructions when required.
+
+### 4. Extracting household reference person attributes
+
+Person-level variables for the household reference person (HHPOS == 1) were selected and transformed into household-level indicators. A proxy for the health status of the household head was constructed as a binary flag:
+
+```{r, eval=FALSE}
+person_head <- person %>%
+filter(HHPOS == 1) %>%
+select(ABSHID, SAHQ01, AGEEC, SEXP, LVLEDUA) %>%
+mutate(
+head_poor_health_flag = case_when(
+SAHQ01 %in% c(4,5) ~ 1L,
+TRUE ~ 0L
+)
+)
+
+person_head2013 <- person2013 %>%
+filter(HHPOS == 1) %>%
+select(ABSHID, DISBPER, AGEBC, SEXP) %>%
+mutate(
+head_poor_health_flag = case_when(
+DISBPER == 2 ~ 1L,
+TRUE ~ 0L
+)
+)
+```
+
++ The household reference person provides demographic and wellbeing proxies that are informative at the household level.
+
++ Differences in variable names between years were handled explicitly to harmonise equivalent constructs.
+
+### 5. Merging components into a household analysis file
+
+Aggregated loan and income measures and the household reference person attributes were merged onto the household frame using left joins keyed by ABSHID:
+
+```{r, eval=FALSE}
+hh_merged <- household %>%
+left_join(loans_agg, by = "ABSHID") %>%
+left_join(iu_agg, by = "ABSHID") %>%
+left_join(person_head, by = "ABSHID")
+
+hh_merged2013 <- household2013 %>%
+left_join(loans_agg2013, by = "ABSHID") %>%
+left_join(iu_agg2013, by = "ABSHID") %>%
+left_join(person_head2013, by = "ABSHID")
+```
+
++ Left joins preserve the household sampling frame while attaching derived covariates. Households lacking particular records (e.g., no loans) appear with NA in the relevant fields, allowing for explicit treatment of missingness downstream.
+
+### 6. Variable renaming and harmonisation
+
+A mapping of original variable codes to descriptive names was applied to improve readability and reproducibility. Conditional renaming was used to accommodate differences in variable availability between years.
+```{r, eval=FALSE}
+rename_map <- c(
+"SIHHHWT"   = "hh_weight",
+"HCOSTH8A"  = "weekly_housing_cost_pct",
+"HCOST10A"  = "weekly_housing_cost_cat",
+"INCTSCH8"  = "hh_total_weekly_income",
+"DISPSCH8"  = "hh_weekly_disposable_income",
+"LIFECYCH"  = "life_cycle_group_code",
+"DPKIDHBC"  = "num_dependents_under25",
+"FSTRSS19"  = "num_financial_stress_events",
+"EMGMONEY"  = "ability_raise_2000_flag"
+)
+
+for(orig in names(rename_map)){
+if(orig %in% names(hh_merged)){
+hh_merged <- hh_merged %>% rename(!!rename_map[[orig]] := all_of(orig))
+}
+}
+
+for(orig in names(rename_map)){
+if(orig %in% names(hh_merged2013)){
+hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
+}
+}
+```
+
++ Human-readable variable names facilitate interpretation of tables, figures and model specifications and reduce error when sharing code.
+
+### 7. Recoding life-cycle groups and deriving outcome flags
+
+Numeric life-cycle codes were recoded to descriptive labels. Multiple housing-stress indicators were constructed using different thresholds to support sensitivity analyses:
+
+```{r, eval=FALSE}
+hh_merged <- hh_merged %>%
+mutate(
+life_cycle_group = case_when(
+life_cycle_group_code == 0  ~ "Not applicable",
+life_cycle_group_code == 1  ~ "Lone person <35",
+life_cycle_group_code == 2  ~ "Couple (ref <35)",
+life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+life_cycle_group_code == 6  ~ "One parent w dependents",
+life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+life_cycle_group_code == 8  ~ "Couple w non-dep only",
+life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+life_cycle_group_code == 11 ~ "Lone person 65+",
+TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+),
+housing_stress_flag = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 30 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 30 ~ 0L,
+TRUE ~ NA_integer_
+),
+housing_stress_flag_20 = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 20 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 20 ~ 0L,
+TRUE ~ NA_integer_
+),
+housing_stress_flag_40 = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 40 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 40 ~ 0L,
+TRUE ~ NA_integer_
+),
+housing_stress_flag_50 = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 50 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 50 ~ 0L,
+TRUE ~ NA_integer_
+),
+ability_raise_2000 = case_when(
+ability_raise_2000_flag == 1 ~ "Can raise $2000",
+ability_raise_2000_flag == 5 ~ "Cannot raise $2000",
+TRUE ~ NA_character_
+)
+)
+```
+
++ Descriptive life-cycle labels reduce reliance on codebooks in figures and tables.
+
++ Multiple housing-stress flags enable sensitivity analysis to threshold choice and facilitate characterization of varying degrees of cost burden.
+
+
+### 8. Constructing survey replicate design objects
+
+Replicate-weight columns were identified programmatically and survey-replicate designs were created using srvyr::as_survey_rep with Fay’s method (rho = 0.5):
+
+```{r,  eval=FALSE}
+rep_cols <- grep("^WHS\d{2}$", names(hh_merged), value = TRUE)
+
+hh_svy <- hh_merged %>%
+as_survey_rep(weights = hh_weight,
+repweights = all_of(rep_cols),
+type = "Fay",
+rho = 0.5)
+```
+An equivalent procedure was used for the 2013 dataset, with a year-specific pattern for the replicate-weight column names.
+
+Rationale and benefits:
+
++ The SIH is a complex survey; proper variance estimation requires replicate weights rather than naive standard errors from simple random-sample assumptions.
+
++ Replicate weights supplied by the ABS reflect the original complex design and permit design-consistent variance estimation.
+
++ Fay’s method is a BRR variant that reduces perturbation extremes and tends to produce more stable variance estimates; rho = 0.5 is a conventional Fay factor for ABS replicate weights.
+
++ The srvyr interface integrates survey-package variance estimation with tidyverse-style pipelines, enabling readable and reproducible analysis code (e.g., group_by() and summarise() combined with survey_mean() and survey_total()).
 
 
 # Exploratory Data Analysis
@@ -220,7 +476,7 @@ Goal 5: Achieve gender equality and empower all women and girls
 
 ```
 
-### Methodology
+### 
 
 
 
