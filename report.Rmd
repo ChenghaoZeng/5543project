@@ -327,7 +327,7 @@ TRUE ~ NA_character_
 
 ### 8. Constructing survey replicate design objects
 
-Replicate-weight columns were identified programmatically and survey-replicate designs were created using srvyr::as_survey_rep with Fay’s method (rho = 0.5):
+Replicate-weight columns are identified programmatically and survey-replicate designs were created using srvyr::as_survey_rep with Fay’s method (rho = 0.5):
 
 ```{r,  eval=FALSE}
 rep_cols <- grep("^WHS\d{2}$", names(hh_merged), value = TRUE)
