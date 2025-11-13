@@ -351,12 +351,9 @@ Rationale and benefits:
 + The srvyr interface integrates survey-package variance estimation with tidyverse-style pipelines, enabling readable and reproducible analysis code (e.g., group_by() and summarise() combined with survey_mean() and survey_total()).
 
 
-# Exploratory Data Analysis
+## Exploratory Data Analysis
 
-### Minimum legal age of marriage without consent
-**Aim:** To explore countries where the minimum legal age of marriage is less than 18
-
-**About:** This dataset is part of the Minimum Gender Dataset compiled by the United Nations Statistics Division.
+### Housing stress distribution across different life cycle groups
 
 ```{r}
 
@@ -365,9 +362,15 @@ Rationale and benefits:
 ```
 
 **Observations:** 
-We can observe that most countries where the legal marriage age is even less than 18 are mostly Asian countries and European island countries. It is mostly observed that Asian countries have long-term traditions and customs which include social stigmas like child marriage due to which such issues still exist in society. Many countries which are dominantly Islamic have high rates of child marriages due to customs existing within religion. 
+Across the four housing stress thresholds (>20%, >30%, >40%, and >50%), the data reveals a consistent and meaningful pattern of inequality across different life-cycle groups. When housing stress is defined at the standard 30% threshold, the group most severely affected is lone persons under 35 years old, with nearly 40% of them spending more than 30% of their household income on housing costs. This indicates that younger individuals living alone face the greatest affordability challenges, likely due to lower average incomes, limited asset accumulation, and high rental expenses relative to their earnings. The second-highest stress levels are found among one-parent families with dependent children, with roughly 30% of this group exceeding the 30% affordability benchmark. This reflects the financial pressure of raising children on a single income while managing housing expenses. Moderate levels of housing stress are observed among lone persons aged 65 and above and households classified as “not applicable,” with around 20% of these groups under stress, possibly reflecting fixed or limited retirement incomes. In contrast, various couple households, particularly those with adult children or mixed-age dependents, exhibit substantially lower stress levels, generally below 10%, indicating the financial stability that can arise from shared income and housing resources.
 
-**Source of Dataset:** [United Nations](https://gender-data-hub-2-undesa.hub.arcgis.com/datasets/8ba8255a4ba047fcb0e6dbe8041a0eb0/explore)
+When the threshold is lowered to 20%, a much larger portion of households fall into the stressed category. More than 60% of young singles and single-parent families exceed this lower cutoff, highlighting their widespread financial vulnerability even under a less stringent definition of housing stress. Older singles also experience notable strain at this level, with around 60% exceeding the 20% threshold, suggesting that many retirees face housing costs that, while not extreme, still consume a considerable portion of their fixed income. By contrast, couple households with children, especially those where the eldest child is under 14, show moderate stress (around 40–45%), while couples with only adult children or couples with mixed dependent and non-dependent children display relatively low stress (below 20%).
+
+At higher thresholds of 40% and 50%, the same ranking of vulnerability persists, but with reduced proportions overall. Lone persons under 35 remain the most burdened group, with about 20% spending over 40% of their income on housing and around 15% exceeding the 50% mark. Single-parent families follow closely behind, with approximately 15% and 12% under these respective thresholds. Meanwhile, older singles and “not applicable” households show around 10% experiencing severe stress at these higher cutoffs, suggesting that while their housing costs are often high relative to income, they are less likely to face extreme affordability crises. In contrast, couple households, across all configurations, display remarkable resilience: their proportions under severe stress drop below 10% at the 40% threshold and fall further below 5% at the 50% level. This pattern demonstrates that shared financial resources and stable tenure arrangements—such as home ownership—substantially buffer couples from extreme housing cost burdens.
+
+Taken together, these findings highlight systematic disparities in housing affordability across life stages and household structures. Young single adults and single-parent families consistently face the highest levels of financial strain, regardless of how housing stress is defined. This persistent pattern underscores the challenges of achieving housing stability among groups with limited earning capacity, fewer economies of scale, and greater exposure to the private rental market. Older single-person households, while moderately stressed, tend to cluster within the 20–40% range, reflecting constrained but somewhat stable housing conditions. In contrast, couple households benefit from income pooling and tenure security, which reduce their vulnerability even under rising housing costs. These cross-threshold trends reveal deep structural inequalities in Australia’s housing system, emphasizing the need for targeted policy interventions—particularly those aimed at assisting young individuals entering the housing market and supporting single parents facing ongoing affordability pressures.
+
+**Source of Dataset:** see readme file to download dataset. 
 
 ### Covid-19 Stringency
 
@@ -386,7 +389,7 @@ We can observe most South Asian countries and North African countries has high s
 China has the highest stringency index. 
 In contrast, it is observed most Central African countries like Chad, Mali, and Asian countries like Yemen and Afghanistan had the lowest stringency index, and yet these countries have the highest number of child marriages globally.  
 
-**Source of Dataset:** [Our World in Data](https://ourworldindata.org/metrics-explained-covid19-stringency-index)
+**Source of Dataset:** see readme file to download dataset. 
 
 
 
