@@ -988,9 +988,14 @@ if(length(influential_idx) > 0){
 
 # 7. Refit the model on the cleaned dataset
 model_formula <- formula(model)   # capture the selected/formula from the original model
-model_clean <- glm(formula = model_formula,
-                   data = explore2019_imputed_clean,
-                   family = binomial(link = "logit"))
+model_clean <- glm(HousingStress ~ 
+    # original vars
+    Life_Cycle_Group + Household_Size + Education_Level + Age_Youngest_Child + 
+    State + Tenure_type + Purchase_price_dwelling + sex_group +
+    # add non-linear term
+    I(scale(Purchase_price_dwelling)^2) + I(Household_Size^2),
+    data = explore2019_imputed_clean,
+    family = binomial(link = "logit"))
 
 # Optionally re-run stepwise selection if the original used step()
 # model_clean <- step(model_clean, trace = FALSE)
@@ -1005,7 +1010,7 @@ cat("Cleaned  model AIC:", AIC(model_clean), "\n")
 
 # 9. Summaries and multicollinearity check
 summary(model_clean)
-car::vif(model_clean)
+car::vif(model_clean, type = "terms")
 
 # 10. Save list of removed indices/IDs for reproducibility
 removed_info <- data.frame(
@@ -1025,7 +1030,6 @@ aug <- augment(model_clean)
 ggplot(aug, aes(x=.fitted, y=.resid)) +
 geom_point() + geom_smooth()
 
-ggplot(aug, aes(sample=.resid)) +
- geom_qq()
+
 ```
 
