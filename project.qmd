@@ -862,25 +862,23 @@ print(plot_fam_interactive)
 #State or Territory of usual residence 2016: STATEHEC
 #Purchase price of dwelling (for dwellings purchased/built in the previous 3 years):HVALPRIC
 #sex_group
-#Number of dependents aged under 25 years in household	DPKIDHBC
+#Number of dependent children aged under 15 years in household: NUMU15BC
 
 set.seed(123)
 
 explore2019<- svy_afford_2019 %>%
   select(
-#    weekly_housing_cost    = HCOSTSH,
-#    weekly_income          = hh_income_from_ius,
-    HousingCostRatio_Range = weekly_housing_cost_cat,
     Life_Cycle_Group       = life_cycle_group, 
     Household_Size         = PERSHBC,
-    Affordability_Ratio    = afford_ratio,
+    HousingStress          = afford_ratio,
     Education_Level        = LVLEDUA,
     Age_Youngest_Child     = AGEKIDH,
     State                  = STATEHEC,
     Tenure_type            = TENURECF,
     Purchase_price_dwelling= HVALPRIC,
     sex_group,
-    Number_of_dependents_in_household = DPKIDHBC
+    Number_of_dependents_in_household = NUMU15BC
+
   ) %>%
    # Filter out Tenure type == 0 (Not applicable)
   filter(Tenure_type != 0)  %>%
@@ -894,9 +892,6 @@ explore2019<- svy_afford_2019 %>%
     State = as.factor(State),
     Tenure_type = as.factor(Tenure_type),
     Education_Level = as.factor(Education_Level),
-    # Recode Weekly housing cost ratio variable:
-    # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
-    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1),
     #only include number of people who can earn money
     Household_Size = Household_Size - Number_of_dependents_in_household)
   
@@ -916,6 +911,22 @@ model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size +
 summary(model)
 car::vif(model)
 ```
+
+
+```{r}
+#deviance test
+anova(model, test="Chisq")
+drop1(model, test="Chisq")
+
+# anova(model2, test="Chisq")
+# drop1(model2, test="Chisq")
+```
+
+
+```{r}
+AIC(model)
+```
+
 
 ```{r detect_remove_influential, eval = FALSE}
 # --- Assumes `model` (fitted glm from explore2019_imputed) already exists ---
@@ -1006,20 +1017,6 @@ if("ABSHID" %in% names(explore2019_imputed)){
 }
 ```
 
-
-```{r}
-#deviance test
-anova(model, test="Chisq")
-drop1(model, test="Chisq")
-
-# anova(model2, test="Chisq")
-# drop1(model2, test="Chisq")
-```
-
-
-```{r}
-AIC(model)
-```
 
 ```{r}
 #Diagnostics 
