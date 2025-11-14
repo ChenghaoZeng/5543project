@@ -386,95 +386,30 @@ Between 2013 and 2019, housing price trends across Australia’s states show cle
 **Source of Dataset:** see readme file to download dataset. 
 
 
-
-### Legal Policies Regarding Child Marriage 
-
-**Aim:** To understand the policies regarding child marriage globally. Timeline: 2019
-
-**Data Dictionary:** spec_tbl_df [131 x 33]
-
-* iso_a3  : ISO3 Country Code
-* Entity  : Country Name
-* Year    : Year
-* Law     : Legal code
-
-```{r warning=FALSE}
-
-```
-
-**Observations:**
-
-+ Even most advanced countries like the USA allow child marriage.
-+ Nordic countries like Switzerland, Denmark, and Sweden are the only countries that completely prohibit child marriage irrespective of any customs or legal exceptions.
-+ Middle-East countries which are mostly Islamic dominant countries like Yemen, Saudi Arabia, and Iran, and African countries like Sudan allow child marriages.
-+ Most African countries like Mali, and Tanzania and, Asian countries like Taiwan, Malaysia, Pakistan, and Afghanistan allow girl-child marriages.
-
-**Source:** [Our World in Data](https://ourworldindata.org/grapher/laws-on-child-marriage)
-
-### Global Child Marriage Rate
-
-**About:** This dataset is part of the Global SDG Indicator Database compiled through the UN System in preparation for the Secretary-General's annual report on Progress towards Sustainable Development Goals. This dataset contains the latest value of the child marriage rate from 2005-2022.
-Indicator 5.3.1: Proportion of women aged 20–24 years who were married or in a union before age 15 and before age 18
-Target 5.3: Eliminate female social issues like child marriage, female gender mutilation
-Goal 5: Achieve gender equality and empower all women and girls
-
-**Data Dictionary:** spec_tbl_df [131 x 33]
-* geoAreaCode : num [1:131] Country Code
-* geoAreaName : chr [1:131] Country Name
-* level_      : num [1:131] Numeric
-* parentCode  : num [1:131] Numeric
-* parentName  : chr [1:131] Sub Continental Region
-* type        : chr [1:131] Geographical level
-* X           : num [1:131] Latitude
-* Y           : num [1:131] Longitude
-* ISO3        : chr [1:131] ISO3 country code
-* latest_value: num [1:131] Child Marriage Rate
-
-```{r data}
-
-
-```
-
-
-```{r visualisation}
-
-
-
-```
-
-
-**Observations:**
-
-+ We can observe most African countries have some of the highest rates of child marriages with countries like Chad, and Niger displaying the highest rate followed by Sudan, Mozambique, Nigeria, etc.
-+ Among Asian countries, Bangladesh has the highest child marriage rate.
-
-**Source:** [UN DESA Statistics Division](https://unstats-undesa.opendata.arcgis.com/datasets/undesa::indicator-5-3-1-proportion-of-women-aged-20-24-years-who-were-married-or-in-a-union-before-age-18-percent/explore?location=2.960853%2C1.735981%2C2.67)
-
-
-### Child Marriage Rate in Sub-continental region during Covid-19
-
-**About:** This dataset contains the Percentage of women (aged 20-24 years) married or in union before age 18 during the Covid-19 period in sub-continental regions. 
-
-```{r echo=FALSE, warning=FALSE, message= FALSE}
-
-
-```
-
-
-**Observation:** We can observe that African countries show the highest rate of child marriage during Covid-19 followed by South Asian countries and Latin American countries. 
-
-**Data Source:** [UNICEF Data](https://data.unicef.org/resources/data_explorer/unicef_f/?ag=UNICEF&df=GLOBAL_DATAFLOW&ver=1.0&dq=.PT_F_20-24_MRD_U15+PT_F_20-24_MRD_U18+PT_F_15-19_MRD..&startPeriod=2016&endPeriod=2022)
-
-
-## Final Visualisation: % women aged 20-24 married before 18 (average 2005-2020) and the legal policy regarding child marriage
-
+### Houing weekly cost among different life cycle groups
 
 ```{r}
 
+
+
+```
+**Observations:** 
+Between 2013 and 2019, housing cost patterns across life-cycle groups show clear structural differences and a progressively widening burden gap. Couple households with dependent children consistently faced the highest housing costs and the most pronounced increases: households with the eldest child aged under 5 saw costs rise from AUD 458 to 486, those with children aged 5–14 increased sharply from AUD 443 to 510 (the highest cost level in 2019), and those with children aged 15–24 rose from AUD 383 to 448. These substantial increases reflect the larger dwelling requirements and higher living expenses for families with children, reinforcing their position as the most financially pressured group. Young single-person households and single-parent families also experienced high and rising costs: young singles increased from AUD 301 to 335, while one-parent families rose from AUD 289 to 333, both remaining in the upper cost tier in 2019 due to limited income sharing and elevated housing needs. In contrast, older households faced far lower and more stable housing costs: couples aged 65+ saw a modest increase from AUD 73 to 90, and older singles rose from AUD 69 to 90, reflecting smaller housing requirements, higher rates of outright homeownership, and relatively stable income structures. Among other couple groups, trends were highly differentiated: couples with reference persons under 35 saw only a slight increase (AUD 430 to 439), while couples aged 55–64 experienced the largest rise of all groups—AUD 187 to 260, likely driven by housing upgrades or changing financial arrangements. Couples with both dependent and non-dependent children saw almost no change (AUD 363 to 365), suggesting stable household structures that buffer against rising costs, and couples with only adult children saw moderate growth (AUD 242 to 281). Overall, the period shows broad but uneven housing cost inflation, with increases ranging from negligible amounts to more than AUD 70. A clear cost hierarchy persists: families with dependent children sit at the top, followed by young singles and single parents, while older households and those with adult children remain in the lowest tier. This structure did not change over time, underscoring that family composition, household size, and income-sharing capacity are the key determinants of housing cost burden. The stability of certain groups—particularly mixed dependent/non-dependent families—highlights how specific household configurations can moderate exposure to market fluctuations. Collectively, the trends point to a pattern of differentiated cost escalation, where families with children, young singles, and single-parent households shoulder disproportionate and intensifying housing pressures, while older households experience consistently lighter and more stable burdens.
+
+**Source of Dataset:** see readme file to download dataset. 
+
+### Houing weekly income among different life cycle groups
+
+```{r}
+
+
+
 ```
 
-### 
+**Observations:** 
+Between 2013 and 2019, household income across different life-cycle groups in Australia exhibited a pattern of sharply differentiated growth, largely driven by family structure, labour-force capacity, and age composition. Couple families with children consistently recorded the highest incomes and some of the most substantial increases: couples with dependents where the eldest child was under 5 rose from AUD 3,555 to AUD 4,139 (+AUD 584, the highest 2019 level), while those with dependents aged 15–24 increased from AUD 2,990 to AUD 3,653 (+AUD 663, the largest overall gain), reflecting the contribution of older dependents who can also participate in the workforce. Couples with dependents aged 5–14 saw more moderate growth from AUD 2,970 to AUD 3,224 (+AUD 254), while couples with non-dependent adult children rose sharply from AUD 2,904 to AUD 3,510 (+AUD 606), again underscoring the income effect of multiple earners. Younger couples and older couples showed contrasting trajectories: couples under 35 increased their income from AUD 2,469 to AUD 2,938 (+AUD 469) as they advanced through early career stages, whereas couples aged 55–64 were the only group to experience a decline, falling from AUD 2,362 to AUD 2,287 (–AUD 75) due to retirement transitions and reduced labour-force participation. Single-person and single-parent households remained in lower income tiers: young singles grew modestly from AUD 1,184 to AUD 1,377 (+AUD 193), and lone persons 65+ increased from AUD 635 to AUD 774 (+AUD 139), remaining the lowest-income group overall because they rely primarily on pension or asset-based income. Single parents with dependents rose from AUD 1,364 to AUD 1,610 (+AUD 246), positioned above single adults but below the majority of couple households due to single-earner constraints. Complex households—couples with both dependent and non-dependent children—experienced moderate growth from AUD 1,262 to AUD 1,486 (+AUD 224), with mixed age structures producing slower income expansion than in families with only older or only younger children. Overall, the period reflected strongly uneven income growth, ranging from declines (–AUD 75 among couples aged 55–64) to substantial increases exceeding AUD 600 in groups with multiple potential earners. A clear income hierarchy persisted throughout 2013–2019: (1) top-earning households were couples with children—especially those with older dependents; (2) mid-tier groups included young couples and couples with adult children; (3) lower-income groups comprised single parents and younger single adults; and (4) the lowest tier consisted of older single individuals. These patterns illustrate a structural trend of “differentiated income expansion,” where household labour-force size, age composition, and employment stage are the primary forces shaping both income levels and growth trajectories.
 
+**Source of Dataset:** see readme file to download dataset. 
 
 
 
