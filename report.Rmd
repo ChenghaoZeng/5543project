@@ -372,11 +372,7 @@ Taken together, these findings highlight systematic disparities in housing affor
 
 **Source of Dataset:** see readme file to download dataset. 
 
-### Covid-19 Stringency
-
-**About:** The stringency index is a composite measure based on nine response indicators including school closures, workplace closures, and travel bans, rescaled to a value from 0 to 100 (100 = strictest). Timeline: 2020-2022
-
-**Aim:** To explore which countries had the strictest government policies in terms of school closures and other lockdown measures
+### Houing purchase price in different state 
 
 ```{r}
 
@@ -385,9 +381,7 @@ Taken together, these findings highlight systematic disparities in housing affor
 ```
 
 **Observations:** 
-We can observe most South Asian countries and North African countries has high stringency index. 
-China has the highest stringency index. 
-In contrast, it is observed most Central African countries like Chad, Mali, and Asian countries like Yemen and Afghanistan had the lowest stringency index, and yet these countries have the highest number of child marriages globally.  
+Between 2013 and 2019, housing price trends across Australia’s states show clear and widening regional disparities. New South Wales (NSW) recorded the most dramatic growth, with average dwelling prices rising from around AUD 590,000 in 2013 to approximately AUD 810,000 in 2019, representing an increase of over 37%—the highest in the country and maintaining its position as the most expensive housing market. Victoria followed a similar trajectory, with prices climbing from AUD 510,000 to around AUD 705,000, an impressive 38% growth, ranking second nationally. The Australian Capital Territory (ACT), though lacking full 2013 data, reached an average of AUD 650,000 in 2019, reflecting steady and solid growth. Queensland showed moderate but stable increases, with prices moving from AUD 460,000 to AUD 530,000, a 15% rise. South Australia experienced only mild growth—from AUD 415,000 to AUD 450,000, less than 10%, indicating a relatively sluggish market. Tasmania, traditionally the most affordable state, saw minimal change, increasing from AUD 360,000 to about AUD 385,000, a rise of less than 7%, maintaining the lowest price level nationwide. In contrast, the Northern Territory saw prices slightly decline from AUD 540,000 to AUD 530,000, showing almost no net growth, while Western Australia experienced the only significant price drop, falling from AUD 530,000 to AUD 490,000, a decrease of more than 7%. Overall, these divergent trends highlight a polarized housing market: New South Wales and Victoria emerged as the dominant growth leaders, with prices soaring well above other states, while Tasmania, South Australia, and Western Australia lagged behind. By 2019, the price hierarchy was firmly stratified—NSW (810k) > Victoria (705k) > ACT (650k) > Queensland (530k) ≈ Northern Territory (530k) > Western Australia (490k) > South Australia (450k) > Tasmania (385k)—revealing a growing structural divide between high- and low-cost regions. This pattern underscores a process of “divergent growth” in the Australian housing market, where economic concentration, population growth, and state-level policy environments have deepened spatial inequality and entrenched regional differences in housing affordability.
 
 **Source of Dataset:** see readme file to download dataset. 
 
