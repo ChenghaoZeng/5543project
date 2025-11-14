@@ -864,7 +864,6 @@ print(plot_fam_interactive)
 #sex_group
 #Number of dependents aged under 25 years in household	DPKIDHBC
 
-
 set.seed(123)
 
 explore2019<- svy_afford_2019 %>%
