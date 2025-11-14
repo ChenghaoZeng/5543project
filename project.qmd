@@ -862,7 +862,8 @@ print(plot_fam_interactive)
 #State or Territory of usual residence 2016: STATEHEC
 #Purchase price of dwelling (for dwellings purchased/built in the previous 3 years):HVALPRIC
 #sex_group
-#hh_total_weekly_repayments
+#Number of dependents aged under 25 years in household	DPKIDHBC
+
 
 set.seed(123)
 
@@ -880,7 +881,7 @@ explore2019<- svy_afford_2019 %>%
     Tenure_type            = TENURECF,
     Purchase_price_dwelling= HVALPRIC,
     sex_group,
-    hh_total_weekly_repayments
+    Number_of_dependents_in_household = DPKIDHBC
   ) %>%
    # Filter out Tenure type == 0 (Not applicable)
   filter(Tenure_type != 0)  %>%
@@ -896,27 +897,10 @@ explore2019<- svy_afford_2019 %>%
     Education_Level = as.factor(Education_Level),
     # Recode Weekly housing cost ratio variable:
     # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
-    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
-    
-
-# check missingness
-na_counts <- explore2019 %>%
-  summarise(
-    across(everything(), ~ sum(is.na(.)))  # 对所有变量，计算NA的数量
-  )
-t(na_counts)
-
-explore2019_df <- as.data.frame(explore2019)
-
-imputed_data <- mice(
-  data = explore2019_df,
-  m = 5,  
-  maxit = 50,
-  method = "pmm",  #use prediction mean match
-  printFlag = FALSE
-)
-
-explore2019_imputed <- complete(imputed_data, action = 1)
+    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1),
+    #only include number of people who can earn money
+    Household_Size = Household_Size - Number_of_dependents_in_household)
+  
 ```
 
 
@@ -926,7 +910,7 @@ explore2019_imputed <- complete(imputed_data, action = 1)
 
 model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
                      Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling + Affordability_Ratio + sex_group + hh_total_weekly_repayments,  
+                     Purchase_price_dwelling + sex_group,  
                        data = explore2019_imputed,
                        family = binomial(link = "logit")) %>% 
   step(trace=FALSE)
@@ -934,33 +918,95 @@ summary(model)
 car::vif(model)
 ```
 
-```{r}
+```{r detect_remove_influential, eval = FALSE}
+# --- Assumes `model` (fitted glm from explore2019_imputed) already exists ---
+# e.g. model <- glm(..., data = explore2019_imputed, family = binomial(link = "logit")) %>% step(trace = FALSE)
 
+# 1. compute Cook's distances
+cooks_d <- cooks.distance(model)
 
-model2 <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
-                     Education_Level + Age_Youngest_Child + State + Tenure_type + 
-                     Purchase_price_dwelling + Affordability_Ratio + sex_group + hh_total_weekly_repayments,  
-                       data = explore2019_imputed,
-                       family = binomial(link = "logit")) %>% 
-  step(trace=FALSE)
-summary(model)
-car::vif(model)
+# 2. summary and diagnostics
+summary(cooks_d)
+n <- nrow(explore2019_imputed)
+p <- length(coef(model))                # number of parameters (including intercept)
+
+# Two common thresholds:
+threshold_4_over_n_minus_p <- 4 / (n - p)   # conservative threshold using model degrees of freedom
+threshold_4_over_n         <- 4 / n         # simpler rule-of-thumb
+
+cat("n =", n, " p =", p, "\n")
+cat("Threshold (4/(n-p)) =", round(threshold_4_over_n_minus_p, 6), "\n")
+cat("Threshold (4/n)       =", round(threshold_4_over_n, 6), "\n")
+
+# 3. identify influential observations (using the chosen threshold)
+influential_idx <- which(cooks_d > threshold_4_over_n_minus_p)
+length(influential_idx)   # how many flagged
+
+# show top influential observations
+top_idx <- order(cooks_d, decreasing = TRUE)[1:20]  # top 20 by Cook's D
+data.frame(index = top_idx, cooks = round(cooks_d[top_idx], 6))
+
+# if there is a household identifier e.g. ABSHID, show it
+if("ABSHID" %in% names(explore2019_imputed)){
+  cat("ABSHID of flagged observations:\n")
+  print(explore2019_imputed$ABSHID[influential_idx])
+}
+
+# 4. plot Cook's distances for visual inspection
+plot(cooks_d, type = "h", ylab = "Cook's distance", main = "Cook's distance (influential obs)")
+abline(h = threshold_4_over_n_minus_p, col = "red", lty = 2)
+abline(h = threshold_4_over_n, col = "blue", lty = 3)
+legend("topright", legend = c("4/(n-p)", "4/n"), col = c("red", "blue"), lty = c(2,3))
+
+# Add labels for the largest points (optional)
+largest <- order(cooks_d, decreasing = TRUE)[1:10]
+text(x = largest, y = cooks_d[largest], labels = largest, pos = 3, cex = 0.8)
+
+# 5. Inspect rows flagged before removing (recommended)
+if(length(influential_idx) > 0){
+  head(explore2019_imputed[influential_idx, ], n = 10)   # view first 10 influential rows
+} else {
+  cat("No influential observations found using this threshold.\n")
+}
+
+# 6. Remove influential observations and create cleaned dataset
+#    (If none found, this will simply copy the original)
+explore2019_imputed_clean <- explore2019_imputed
+if(length(influential_idx) > 0){
+  explore2019_imputed_clean <- explore2019_imputed[-influential_idx, ]
+}
+
+# 7. Refit the model on the cleaned dataset
+model_formula <- formula(model)   # capture the selected/formula from the original model
+model_clean <- glm(formula = model_formula,
+                   data = explore2019_imputed_clean,
+                   family = binomial(link = "logit"))
+
+# Optionally re-run stepwise selection if the original used step()
+# model_clean <- step(model_clean, trace = FALSE)
+
+# 8. Compare original vs cleaned model
+cat("Original model AIC:", AIC(model), "\n")
+cat("Cleaned  model AIC:", AIC(model_clean), "\n")
+
+# If models are nested, likelihood-ratio test can be informative:
+# (Note: if step selection changed the formula, anova test may be invalid)
+# anova(model, model_clean, test = "Chisq")
+
+# 9. Summaries and multicollinearity check
+summary(model_clean)
+car::vif(model_clean)
+
+# 10. Save list of removed indices/IDs for reproducibility
+removed_info <- data.frame(
+  row_index = influential_idx,
+  cooks_d = cooks_d[influential_idx]
+)
+if("ABSHID" %in% names(explore2019_imputed)){
+  removed_info$ABSHID <- explore2019_imputed$ABSHID[influential_idx]
+}
 ```
-The main predictors are:
 
-weekly_housing_cost ↑ → higher stress
-
-weekly_income ↑ → lower stress
-
-weekly_housing_cost × weekly_income → the effect of cost depends on income level (interaction)
-
-Tenure_type and Purchase_price_dwelling also matter.
-
-Interaction interpretation:
-
-For low-income households, rising housing costs rapidly increase stress.
-
-For high-income households, that effect is smaller — they can absorb higher costs.
 
 ```{r}
 #deviance test
@@ -979,11 +1025,11 @@ AIC(model)
 ```{r}
 #Diagnostics 
 
-# aug <- augment(model2)
-# ggplot(aug, aes(x=.fitted, y=.resid)) +
-# geom_point() + geom_smooth()
-# 
-# ggplot(aug, aes(sample=.resid)) +
-#  geom_qq()
+aug <- augment(model_clean)
+ggplot(aug, aes(x=.fitted, y=.resid)) +
+geom_point() + geom_smooth()
+
+ggplot(aug, aes(sample=.resid)) +
+ geom_qq()
 ```
 
