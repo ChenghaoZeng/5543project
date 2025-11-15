@@ -28,6 +28,7 @@ library(logistf)
 library(visreg)
 library(broom)
 library(mice)
+library(mgcv)
 ```
 
 ```{r}
@@ -868,17 +869,15 @@ set.seed(123)
 
 explore2019<- svy_afford_2019 %>%
   select(
+    HousingCostRatio_Range = weekly_housing_cost_cat,
     Life_Cycle_Group       = life_cycle_group, 
     Household_Size         = PERSHBC,
-    HousingStress          = afford_ratio,
     Education_Level        = LVLEDUA,
     Age_Youngest_Child     = AGEKIDH,
     State                  = STATEHEC,
     Tenure_type            = TENURECF,
     Purchase_price_dwelling= HVALPRIC,
-    sex_group,
-    Number_of_dependents_in_household = NUMU15BC
-
+    sex_group
   ) %>%
    # Filter out Tenure type == 0 (Not applicable)
   filter(Tenure_type != 0)  %>%
@@ -892,9 +891,25 @@ explore2019<- svy_afford_2019 %>%
     State = as.factor(State),
     Tenure_type = as.factor(Tenure_type),
     Education_Level = as.factor(Education_Level),
-    #only include number of people who can earn money
-    Household_Size = Household_Size - Number_of_dependents_in_household)
-  
+    # Recode Weekly housing cost ratio variable:
+    # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
+    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
+    
+# check missingness
+na_counts <- explore2019 %>%
+  summarise(
+    across(everything(), ~ sum(is.na(.)))  
+  )
+t(na_counts)
+explore2019_df <- as.data.frame(explore2019)
+imputed_data <- mice(
+  data = explore2019_df,
+  m = 5,  
+  maxit = 50,
+  method = "pmm",  #use prediction mean match
+  printFlag = FALSE
+)
+explore2019_imputed <- complete(imputed_data, action = 1)
 ```
 
 
@@ -910,21 +925,6 @@ model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size +
   step(trace=FALSE)
 summary(model)
 car::vif(model)
-```
-
-
-```{r}
-#deviance test
-anova(model, test="Chisq")
-drop1(model, test="Chisq")
-
-# anova(model2, test="Chisq")
-# drop1(model2, test="Chisq")
-```
-
-
-```{r}
-AIC(model)
 ```
 
 
@@ -988,14 +988,19 @@ if(length(influential_idx) > 0){
 
 # 7. Refit the model on the cleaned dataset
 model_formula <- formula(model)   # capture the selected/formula from the original model
-model_clean <- glm(HousingStress ~ 
-    # original vars
-    Life_Cycle_Group + Household_Size + Education_Level + Age_Youngest_Child + 
-    State + Tenure_type + Purchase_price_dwelling + sex_group +
-    # add non-linear term
-    I(scale(Purchase_price_dwelling)^2) + I(Household_Size^2),
-    data = explore2019_imputed_clean,
-    family = binomial(link = "logit"))
+model_clean <- gam(
+  HousingStress ~ 
+    Life_Cycle_Group + 
+    Household_Size + 
+    Education_Level + 
+    Age_Youngest_Child + 
+    State + 
+    Tenure_type + 
+    sex_group +
+    s(Purchase_price_dwelling, k = 10),   # smooth financial variable
+  data = explore2019_imputed_clean,
+  family = binomial(link = "logit")
+)
 
 # Optionally re-run stepwise selection if the original used step()
 # model_clean <- step(model_clean, trace = FALSE)
@@ -1010,16 +1015,8 @@ cat("Cleaned  model AIC:", AIC(model_clean), "\n")
 
 # 9. Summaries and multicollinearity check
 summary(model_clean)
-car::vif(model_clean, type = "terms")
+car::vif(model_clean)
 
-# 10. Save list of removed indices/IDs for reproducibility
-removed_info <- data.frame(
-  row_index = influential_idx,
-  cooks_d = cooks_d[influential_idx]
-)
-if("ABSHID" %in% names(explore2019_imputed)){
-  removed_info$ABSHID <- explore2019_imputed$ABSHID[influential_idx]
-}
 ```
 
 
