@@ -928,7 +928,7 @@ car::vif(model)
 ```
 
 
-```{r detect_remove_influential, eval = FALSE}
+```{r detect_remove_influential}
 # --- Assumes `model` (fitted glm from explore2019_imputed) already exists ---
 # e.g. model <- glm(..., data = explore2019_imputed, family = binomial(link = "logit")) %>% step(trace = FALSE)
 
@@ -988,16 +988,12 @@ if(length(influential_idx) > 0){
 
 # 7. Refit the model on the cleaned dataset
 model_formula <- formula(model)   # capture the selected/formula from the original model
-model_clean <- gam(
-  HousingStress ~ 
-    Life_Cycle_Group + 
-    Household_Size + 
-    Education_Level + 
-    Age_Youngest_Child + 
-    State + 
-    Tenure_type + 
-    sex_group +
-    s(Purchase_price_dwelling, k = 10),   # smooth financial variable
+model_clean <- glm(HousingStress ~ 
+    # original vars
+    Life_Cycle_Group + Education_Level + Age_Youngest_Child + 
+    State + Tenure_type + sex_group +
+    # add non-linear term
+    I(scale(Purchase_price_dwelling)^2) + I(Household_Size^2),   
   data = explore2019_imputed_clean,
   family = binomial(link = "logit")
 )
@@ -1022,7 +1018,6 @@ car::vif(model_clean)
 
 ```{r}
 #Diagnostics 
-
 aug <- augment(model_clean)
 ggplot(aug, aes(x=.fitted, y=.resid)) +
 geom_point() + geom_smooth()
