@@ -1059,7 +1059,7 @@ Beyond simple affordability concerns, housing stress affects family functioning,
 
 The motivation for this study arises from these concerns. By analysing national household survey data across multiple years, this project aims to clarify which groups face the highest burden and why — thereby helping to inform future housing and welfare policy.
 
-# Objectives and Significance
+# Objectives
 
 The analysis has four main objectives:
 
@@ -1074,18 +1074,6 @@ This study was undertaken as part of my internship at the Australian Institute o
 As an intern analyst at AIFS, my role focused on using data-driven methods to explore issues affecting Australian families, particularly in relation to housing affordability and economic stress. This project was designed not only as an academic exercise but as a practical contribution to AIFS’s mission of supporting evidence-based policy.
 
 The analysis contributes to this broader goal by producing reproducible, interpretable, and visually engaging insights that can be shared with policymakers, researchers, and the public.
-
-The significance of this study lies in its combination of statistical modelling and visual storytelling. By blending quantitative rigour with clear, visual communication, the analysis aims to:
-
-+ Enhance understanding of complex affordability dynamics among different population groups,
-
-+ Inform evidence-based decision making on housing and social welfare policy, and
-
-+ Provide an analytical framework that can be extended with future data — for example, to assess housing stress patterns in the post-COVID period.
-
-Ultimately, this project bridges the gap between academic research and policy application, demonstrating how analytical insights can be translated into meaningful recommendations that improve family and community wellbeing across Australia.
-
-
 
 # Data Processing
 
@@ -1528,33 +1516,40 @@ This continuation will enable a more complete understanding of housing stress in
 
 # References
 
-+ UNICEF. (2021) 10 million additional girls at risk of child marriage due to COVID-19, UNICEF. Available at: https://www.unicef.org/eap/press-releases/10-million-additional-girls-risk-child-marriage-due-covid-19-unicef
++ Hutchens, G. (2024, May 14). Australia’s housing crisis in 10 graphs, from the federal budget. ABC News. https://www.abc.net.au/news/2024-05-15/federal-budget-housing-crisis-in-10-graphs/103847336
 
-+ Onabanjo, J., Kalasa, B., & Abdel-Ahad, M. (2014, May 28). OP-ED: ENDING CHILD MARRIAGE IN AFRICA CAN NO LONGER WAIT. Global Information Network Retrieved from https://www.proquest.com/wire-feeds/op-ed-ending-child-marriage-africa-can-no-longer/docview/1534961300/se-2
++ Wickham, H., Averick, M., Bryan, J., Chang, W., McGowan, L., François, R., … Yutani, H. (2019). tidyverse: Easily install and load the ‘tidyverse’ (R package version 1.3.2). https://CRAN.R-project.org/package=tidyverse
 
-+ KAMAL, S. M. M., HASSAN, C. H., ALAM, G. M., & YING, Y. (2015). CHILD MARRIAGE IN BANGLADESH: TRENDS AND DETERMINANTS. Journal of Biosocial Science, 47(1), 120-39. doi:https://doi.org/10.1017/S0021932013000746
++ Lumley, T. (2020). survey: Analysis of complex survey samples (R package version 4.1-1). https://CRAN.R-project.org/package=survey
 
-+ Afrin, Tangina, & Zainuddin, Mohammad. (2021). Spike in child marriage in Bangladesh during COVID-19: Determinants and interventions. Child Abuse & Neglect, 112, 104918–104918. https://doi.org/10.1016/j.chiabu.2020.104918
++ Thomas, L., & Lumley, T. (2019). srvyr: ‘dplyr’-style syntax for summary statistics of survey data (R package version 1.1.1). https://CRAN.R-project.org/package=srvyr
 
-+ The economy of wellbeing: what is it and what are the implications for health? BMJ 2020; 369 doi: https://doi.org/10.1136/bmj.m1874
++ Wickham, H. (2023). scales: Scale functions for visualization (R package version 1.3.2). https://CRAN.R-project.org/package=scales
 
-+ Pebesma, E., & Bivand, R. (2023). Spatial Data Science: With Applications in R (1st
-  ed.). Chapman and Hall/CRC. https://doi.org/10.1201/9780429459016
++ Müller, K., & Wickham, H. (2023). glue: Interpreted string literals (R package version 1.6.3). https://CRAN.R-project.org/package=glue
 
-+ Zeileis A, Fisher JC, Hornik K, Ihaka R, McWhite CD, Murrell P, Stauffer R, Wilke CO
-(2020). “colorspace: A Toolbox for Manipulating and Assessing Colors and Palettes.”
-_Journal of Statistical Software_, *96*(1), 1-49. doi: 10.18637/jss.v096.i01 (URL:
-https://doi.org/10.18637/jss.v096.i01).
++ Sievert, C. (2020). plotly: Create interactive web graphics via ‘plotly.js’ (R package version 4.10.0). https://CRAN.R-project.org/package=plotly
 
-+ Chan, C., Geoffrey CH Chan, Leeper, T.J. and Becker, J. (2021). rio: A Swiss-army knife for data file I/O.
-+ FC, M., Davis, T.L. and ggplot2 authors (2022). ggpattern: ‘ggplot2’ pattern geoms. [online] Available at: https://cran.r-project.org/package=ggpattern.
-+ Firke, S. (2023). janitor: Simple tools for examining and cleaning dirty data. [online] Available at: https://cran.r-project.org/package=janitor.
-+ Garnier, Simon, Ross, Noam, Rudis, Robert, Camargo, Pedro, A., Sciaini, Marco, Scherer and Cédric (2021). viridis - colorblind-friendly color maps for r. [online] doi:https://doi.org/10.5281/zenodo.4679424.
-+ Massicotte, P. and South, A. (2023). rnaturalearth: World map data from natural earth. [online] Available at: https://cran.r-project.org/package=rnaturalearth.
-Ooms, J. (2022). gifski: Highest quality GIF encoder. [online] Available at: https://cran.r-project.org/package=gifski.
-+ Sievert, C. (2020). Interactive web-based data visualization with r, plotly, and shiny. [online] Chapman and Hall/CRC. Available at: https://plotly-r.com.
-+ Tierney, N. and Cook, D. (2023). Expanding tidy data principles to facilitate missing data exploration, visualization and assessment of imputations. Journal of Statistical Software, 105, pp.1–31. doi:https://doi.org/10.18637/jss.v105.i07.
-+ Wickham, H. (2016). ggplot2: Elegant graphics for data analysis. [online] Springer-Verlag New York. Available at: https://ggplot2.tidyverse.org.
-+ Wickham, H., Averick, M., Bryan, J., Chang, W., Lucy D'Agostino McGowan, Romain François, Grolemund, G., Hayes, A., Henry, L., Hester, J., Kuhn, M., Thomas Lin Pedersen, Miller, E., Stephan Milton Bache, Kirill Müller, Ooms, J., Robinson, D., Dana Paige Seidel, Vitalie Spinu and Takahashi, K. (2019). Welcome to the tidyverse. Journal of Open Source Software, 4, p.1686. doi:https://doi.org/10.21105/joss.01686.
-+ Wickham, H. and Bryan, J. (2023). readxl: Read excel files. [online] Available at: https://cran.r-project.org/package=readxl.
++ Pedersen, T. L. (2020). patchwork: The composer of plots (R package version 1.1.2). https://CRAN.R-project.org/package=patchwork
+
++ Venables, W. N., & Ripley, B. D. (2002). nnet: Feed-forward neural networks and multinomial log-linear models (R package version 7.3-20). https://CRAN.R-project.org/package=nnet
+
++ Wickham, H., François, R., Henry, L., & Müller, K. (2023). dplyr: A grammar of data manipulation (R package version 1.1.3). https://CRAN.R-project.org/package=dplyr
+
++ Wickham, H., & Henry, L. (2023). tidyr: Tidy messy data (R package version 1.3.1). https://CRAN.R-project.org/package=tidyr
+
++ Fox, J., & Weisberg, S. (2019). car: Companion to applied regression (R package version 3.1-1). https://CRAN.R-project.org/package=car
+
++ Grömping, U., & Zeileis, A. (2021). brglm2: Bias reduction in generalized linear models (R package version 0.7.2). https://CRAN.R-project.org/package=brglm2
+
++ Heinze, G., & Ploner, M. (2022). logistf: Firth’s bias-reduced logistic regression (R package version 1.25). https://CRAN.R-project.org/package=logistf
+
++ Breheny, P., & Burchett, W. (2023). visreg: Visualization of regression models (R package version 2.9-0). https://CRAN.R-project.org/package=visreg
+
++ Robinson, D., & Hayes, A. (2023). broom: Convert statistical objects into tidy tibbles (R package version 1.0.9). https://CRAN.R-project.org/package=broom
+
++ van Buuren, S., & Groothuis-Oudshoorn, K. (2011). mice: Multivariate imputation by chained equations (R package version 3.14.0). https://CRAN.R-project.org/package=mice
+
+# Note
+“AI tools were used to assist with formatting references in APA7 style, improving syntax, and enhancing clarity. All ideas and content are my own.”
 
