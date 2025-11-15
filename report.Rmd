@@ -68,13 +68,11 @@ The motivation for this study arises from these concerns. By analysing national 
 
 The analysis has four main objectives:
 
-1: To describe how housing stress levels have changed over time (2013–2019).
+**Topic 1:** To describe how housing stress levels have changed over time (2013–2019) and identify which demographic and household groups are most at risk.
 
-2: To identify which demographic and household groups are most at risk.
+**Topic 2:**: To model key drivers — such as household structure, education, tenure type, and financial variables — that explain housing stress.
 
-3: To model key drivers — such as household structure, education, tenure type, and financial variables — that explain housing stress.
-
-4: To translate findings into practical, policy-relevant insights.
+Finally to translate findings into practical, policy-relevant insights.
 
 This study was undertaken as part of my internship at the Australian Institute of Family Studies (AIFS), an independent statutory agency of the Australian Government within the Department of Social Services. AIFS conducts high-quality research to increase understanding of the factors that affect family wellbeing and to inform government policy and service delivery. Its work covers diverse areas such as family relationships, housing and financial security, child wellbeing, and social inclusion.
 
@@ -92,16 +90,16 @@ The significance of this study lies in its combination of statistical modelling 
 
 Ultimately, this project bridges the gap between academic research and policy application, demonstrating how analytical insights can be translated into meaningful recommendations that improve family and community wellbeing across Australia.
 
-# Methodology
 
-## Data Processing
 
-### Overview
+# Data Processing
+
+## Overview
 
 The Statistical Income and Housing (SIH) microdata for 2013 and 2019 were prepared and harmonised into household-level analysis files. The following sections document the steps performed to construct the analysis datasets, the rationale behind key transformations, and important implementation checks. All operations are described in a neutral, reproducible manner and correspond to the R code used in the analysis pipeline.
 
 
-### 1. Loading raw files
+## 1. Loading raw files
 Household-level, person-level, income and loan CSV files were read for both survey years. The files correspond to the SIH file components:
 
 + BH — household-level file
@@ -130,7 +128,7 @@ person2013 <- read_csv("data/CSV/SIH13BP.csv", show_col_types = FALSE)
 
 + read_csv(..., show_col_types = FALSE) suppresses the printing of column type messages for cleaner logs while preserving column types.
 
-### 2. Aggregating loan records to household level
+## 2. Aggregating loan records to household level
 
 Loan records are at the loan-level and were aggregated to household totals using the household identifier (ABSHID). The aggregated measures produced are:
 
@@ -168,7 +166,7 @@ loans_agg2013 <- loans2013 %>%
 
 + na.rm = TRUE prevents missing loan entries from producing NA sums; the semantic meaning of missing values should be assessed (e.g., missing vs no loans).
 
-### 3. Aggregating income-unit / income records to household level
+## 3. Aggregating income-unit / income records to household level
 
 Income records were aggregated by household to create an auxiliary household-level income measure and a count of income units:
 ```{r, eval=FALSE}
@@ -191,7 +189,7 @@ hh_num_ius = n(),
 
 + Summed income from income units provides an independent check against the household income variable in the household file and supports alternative income constructions when required.
 
-### 4. Extracting household reference person attributes
+## 4. Extracting household reference person attributes
 
 Person-level variables for the household reference person (HHPOS == 1) were selected and transformed into household-level indicators. A proxy for the health status of the household head was constructed as a binary flag:
 
@@ -221,7 +219,7 @@ TRUE ~ 0L
 
 + Differences in variable names between years were handled explicitly to harmonise equivalent constructs.
 
-### 5. Merging components into a household analysis file
+## 5. Merging components into a household analysis file
 
 Aggregated loan and income measures and the household reference person attributes were merged onto the household frame using left joins keyed by ABSHID:
 
@@ -239,7 +237,7 @@ left_join(person_head2013, by = "ABSHID")
 
 + Left joins preserve the household sampling frame while attaching derived covariates. Households lacking particular records (e.g., no loans) appear with NA in the relevant fields, allowing for explicit treatment of missingness downstream.
 
-### 6. Variable renaming and harmonisation
+## 6. Variable renaming and harmonisation
 
 A mapping of original variable codes to descriptive names was applied to improve the readability and reproducibility. Conditional renaming was used to accommodate differences in variable availability between years.
 ```{r, eval=FALSE}
@@ -270,7 +268,7 @@ hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
 
 + Human-readable variable names facilitate interpretation of tables, figures and model specifications and reduce error when sharing code.
 
-### 7. Recoding life-cycle groups and deriving outcome flags
+## 7. Recoding life-cycle groups and deriving outcome flags
 
 Numeric life-cycle codes are recoded to descriptive labels. Multiple housing-stress indicators were constructed using different thresholds to support sensitivity analyses:
 
@@ -325,7 +323,7 @@ TRUE ~ NA_character_
 + Multiple housing-stress flags enable sensitivity analysis to threshold choice and facilitate characterization of varying degrees of cost burden.
 
 
-### 8. Constructing survey replicate design objects
+## 8. Constructing survey replicate design objects
 
 Replicate-weight columns are identified programmatically and survey-replicate designs were created using srvyr::as_survey_rep with Fay’s method (rho = 0.5):
 
@@ -350,6 +348,9 @@ Rationale and benefits:
 
 + The srvyr interface integrates survey-package variance estimation with tidyverse-style pipelines, enabling readable and reproducible analysis code (e.g., group_by() and summarise() combined with survey_mean() and survey_total()).
 
+
+
+# Topic 1: Visualization
 
 ## Exploratory Data Analysis
 
@@ -393,6 +394,7 @@ Between 2013 and 2019, housing price trends across Australia’s states show cle
 
 
 ```
+
 **Observations:** 
 Between 2013 and 2019, housing cost patterns across life-cycle groups show clear structural differences and a progressively widening burden gap. Couple households with dependent children consistently faced the highest housing costs and the most pronounced increases: households with the eldest child aged under 5 saw costs rise from AUD 458 to 486, those with children aged 5–14 increased sharply from AUD 443 to 510 (the highest cost level in 2019), and those with children aged 15–24 rose from AUD 383 to 448. These substantial increases reflect the larger dwelling requirements and higher living expenses for families with children, reinforcing their position as the most financially pressured group. Young single-person households and single-parent families also experienced high and rising costs: young singles increased from AUD 301 to 335, while one-parent families rose from AUD 289 to 333, both remaining in the upper cost tier in 2019 due to limited income sharing and elevated housing needs. In contrast, older households faced far lower and more stable housing costs: couples aged 65+ saw a modest increase from AUD 73 to 90, and older singles rose from AUD 69 to 90, reflecting smaller housing requirements, higher rates of outright homeownership, and relatively stable income structures. Among other couple groups, trends were highly differentiated: couples with reference persons under 35 saw only a slight increase (AUD 430 to 439), while couples aged 55–64 experienced the largest rise of all groups—AUD 187 to 260, likely driven by housing upgrades or changing financial arrangements. Couples with both dependent and non-dependent children saw almost no change (AUD 363 to 365), suggesting stable household structures that buffer against rising costs, and couples with only adult children saw moderate growth (AUD 242 to 281). Overall, the period shows broad but uneven housing cost inflation, with increases ranging from negligible amounts to more than AUD 70. A clear cost hierarchy persists: families with dependent children sit at the top, followed by young singles and single parents, while older households and those with adult children remain in the lowest tier. This structure did not change over time, underscoring that family composition, household size, and income-sharing capacity are the key determinants of housing cost burden. The stability of certain groups—particularly mixed dependent/non-dependent families—highlights how specific household configurations can moderate exposure to market fluctuations. Collectively, the trends point to a pattern of differentiated cost escalation, where families with children, young singles, and single-parent households shoulder disproportionate and intensifying housing pressures, while older households experience consistently lighter and more stable burdens.
 
@@ -411,20 +413,101 @@ Between 2013 and 2019, household income across different life-cycle groups in Au
 
 **Source of Dataset:** see readme file to download dataset. 
 
+## Final Visualisation 
+
+```{r}
+
+```
+
+**Observations:** 
+The housing affordability ratio (weekly housing cost ÷ weekly income) reveals substantial variation across life-cycle groups and clear divergence between 2013 and 2019. The burden gap between groups was highly polarised, with certain households facing extremely high ratios: young single adults (Lone person <35) recorded an exceptionally heavy burden, falling from a very high 279.4% in 2013 to 161% in 2019, meaning housing costs far exceeded income even after the decline. Older single adults (Lone person 65+) showed an extraordinary shift from 660.7% in 2013 to 2.5% in 2019, a dramatic change likely driven by differences in income reporting, sample composition, or major structural shifts in economic circumstances. Single parents (One parent with dependents) consistently experienced high burden levels, remaining around 57.6% in both years, indicating persistent affordability pressure. Some groups experienced moderate burden levels, such as younger couples (Couple ref <35), whose ratio surged from 24.3% to 57.9%, representing a sharp deterioration in affordability, while couples aged 55–64 saw their burden drop dramatically from 137.8% to 55.8%, marking a substantial improvement. Meanwhile, the lowest-burden groups included most couple families with children, couples with adult children, and older couples, many of whom recorded ratios below 20%, with several falling below 5% by 2019, reflecting very light housing cost pressures. From 2013 to 2019, trends diverged significantly: housing burden intensified sharply for younger couples, fell markedly for older couples, families with young children, and couples with adult children—often with reductions exceeding 50%—and remained largely stable for single parents and couples with older dependent children, where changes stayed within ±5%. Overall, the figure illustrates a pattern of intensifying inequality in housing affordability, where some groups face persistent or worsening strain while others experienced major relief.
+
+```{r}
+
+```
+
+**Observations:** 
+The figure on the proportion of households experiencing housing stress (defined as spending more than 30% of income on housing) by gender in 2013 and 2019 shows a clear and persistent gender gap, even when considering the 95% confidence intervals. In 2013, female-led households had a noticeably higher housing stress rate (around 20%) compared with male-led households (around 16%), and the same pattern persisted in 2019, with female households at approximately 18% and male households at about 14%. This consistent disparity suggests that women are structurally more vulnerable to housing stress, likely influenced by differences in earnings, employment patterns, and caregiving responsibilities. Between 2013 and 2019, both groups experienced a modest decline in the prevalence of housing stress—male households dropping from about 16% to 14%, and female households from about 20% to 18%—indicating a slight overall improvement in affordability conditions. However, despite this general downward movement, the gender gap remained essentially unchanged, highlighting the persistent nature of gendered housing inequality.
+
+#### Conclusion
+The two visualisations together highlight a deeply uneven landscape of housing affordability in Australia, where both life-cycle stage and gender shape households’ exposure to financial stress in distinct but interconnected ways. The first figure shows that affordability pressures vary dramatically across household types, with young single adults, single parents, and some older single households experiencing the most severe burdens. These extremes—such as ratios well above 100% for young adults in 2013 or the dramatic shift among older singles—underscore how volatile and vulnerable certain life-cycle groups are to changes in income, labour market conditions, or housing costs. In contrast, many couple-based households, particularly those older or with adult children, report very low burdens that improved further by 2019, suggesting stable income positions and stronger capacity to absorb rising housing costs. Overall, the widening divergence between groups points to a pattern of intensifying affordability inequality: while some households experienced significant relief, others remained persistently or increasingly strained.
+
+The second visualisation reinforces this inequality by revealing a persistent gender gap in housing stress. Female-led households consistently face higher rates of spending more than 30% of income on housing than male-led households, with the disparity holding steady from 2013 to 2019 despite slight improvements for both groups. This suggests that gendered economic disadvantages—such as lower average earnings, greater likelihood of part-time work, and higher caregiving responsibilities—continue to limit women’s housing security, regardless of broader market conditions. Taken together, the two sets of findings point to structural vulnerabilities that disproportionately affect young singles, single parents, and women. These results indicate that improvements in overall housing conditions do not translate evenly across demographic groups and emphasise the need for targeted policy responses that address both life-cycle-specific and gendered inequalities in housing affordability.
 
 
-# Discussion
-5.1 Interpreting the Patterns
 
-The findings paint a nuanced picture of Australia’s housing stress landscape. Although some improvements occurred between 2013 and 2019, the benefits were unevenly distributed.
+# Topic 2: Logistic model regression interpretation
 
-+ Younger and single-parent households remained the most financially vulnerable, reflecting unstable income sources and limited access to affordable housing.
+This analysis fits a logistic regression model predicting a binary housing-stress outcome (HousingStress = 1 when weekly housing costs exceed 30% of gross household income). The model uses demographic, socioeconomic, and household-structure predictors—such as life-cycle group, household size, education level, age of youngest child, state, tenure type, purchase-price proxy, and sex—and is estimated with a binomial logit link. The purpose is to understand which household characteristics are associated with higher odds of experiencing housing stress.
 
-+ Gender inequality persisted, showing that broader economic disparities spill over into housing outcomes.
+```{r}
 
-+ Household size and composition played a protective role — highlighting the importance of shared financial support systems.
+```
 
-These patterns suggest that housing stress is both a financial and social phenomenon, embedded in broader structures of inequality.
+## Methodology
+
+The accompanying code first constructs a cleaned analytic dataset by selecting relevant variables, removing inapplicable tenure codes, recoding invalid age values, converting categorical variables to factors, and defining the binary HousingStress indicator; missing values are then handled using predictive mean-matching multiple imputation (via mice()). A Cook’s-distance procedure is then applied to an existing fitted logistic model to identify influential observations: Cook’s distances are computed, thresholds (4/(n–p) and 4/n) are established, flagged cases are listed and visualised, and those observations exceeding the threshold are removed to create a cleaned dataset. The logistic model is then refitted on the cleaned sample with the same predictors plus explicitly specified non-linear terms for scaled dwelling-purchase price and household size. Model fit is compared using AIC, and multicollinearity is assessed using VIF. Finally, diagnostic checking is extended by generating an augmented data frame (via augment(model_clean)) and plotting fitted values against residuals using ggplot2; this provides a visual assessment of model adequacy, potential patterns in residuals, and any remaining signs of mis-specification.
+
+## Observation
+
+**Residual Deviance:**  
+The residual deviance of the original model was **12,591**, while the improved model reduced it to **7,645**.  
+Residual deviance reflects the amount of unexplained variation in the model—**lower values indicate stronger explanatory power**.  
+The substantial drop means the improved model explains variation in housing stress much more effectively.
+
+**AIC (Akaike Information Criterion):**  
+The original model had an AIC of **12,667**, which decreased to **7,721** in the improved model.  
+AIC incorporates both model fit and model complexity; **a lower AIC implies a better-performing model**.  
+The large decrease demonstrates that the improved model achieves substantially better model fit without adding unnecessary complexity.
+
+**Coefficient Significance:**  
+
+In the improved model, variables such as **Life_Cycle_Group**, **Age_Youngest_Child**, **State**, **Tenure_type**, and **sex_group** remain highly significant.  
+By contrast, several categories of **Education_Level** were not significant in the original model.  
+This indicates that after refinement, the relationships between predictors and **housing stress** are clearer, stronger, and more interpretable.
+
+**Multicollinearity Analysis (VIF):**  
+
+We examined the VIF values from the original model (based on `car::vif`).  
+Interpretation relies on **GVIF^(1/(2*Df))**, which adjusts for multi-category categorical predictors.
+
+- **Household_Size** had a GVIF-adjusted value of **1.91**, close to the threshold of **2**, indicating mild multicollinearity.  
+- Other predictors, including **Education_Level**, **State**, and **sex_group**, had adjusted GVIF values close to **1**, showing minimal collinearity.
+
+The improved model also suggests minimal collinearity, as the adjusted GVIF values for the predictors remain close to 1. We expect reduced multicollinearity because **non-linear transformations and outlier removal** generally reduce artificial linear dependencies among predictors.
+
+## Residual Diagnostics
+
+```{r}
+
+```
+
+The residual plot for the improved model shows:
+
+- Stable and flat residual patterns when fitted values are between roughly –30 and –10. This indicates that the nonlinearity issues present in the original model have been substantially resolved.
+
+- Local instability near fitted values close to 0, where residuals show more extreme variation. This suggests that some local outlier effects or remaining nonlinearity still need further examination.
+
+## Discussion
+The improved model highlights several important relationships. Households such as lone persons under 35, one-parent families, and couples with dependents have significantly higher odds of experiencing housing stress compared with the reference group, indicating that life-cycle structure is a key determinant. Households with younger children also face greater risk, as shown by the negative association between the age of the youngest child and housing stress. Strong regional effects are present, with households in all other states showing lower housing stress than those in the reference state(NSW). Tenure types associated with renting or mortgage payments substantially increase the likelihood of housing stress, while male-led households are less likely to experience stress than female-led ones. Finally, the negative squared term for household size suggests a nonlinear relationship where larger households benefit from income pooling, reducing their overall housing stress risk.
+
+## Conclusion
+
+Overall, the improved logistic regression model provides a clearer, more robust, and more interpretable understanding of the factors associated with household housing stress. By addressing missing data, removing influential outliers, and incorporating important non-linear effects, the model achieves substantially better fit—as reflected by large reductions in both residual deviance and AIC—while also improving the consistency and significance of key predictors. The findings indicate that housing stress is strongly shaped by household life-cycle stage, childcare responsibilities, state of residence, and tenure type, with female-led and renter/mortgagor households facing notably higher risks. The nonlinear relationship with household size suggests the presence of income-sharing benefits that reduce stress in larger households. Although some local residual irregularities remain, the overall diagnostics indicate that the refined model captures the main structural drivers of housing stress effectively, providing a solid foundation for further analysis or policy-relevant interpretation.
+
+# Policy recommendations
+
+**Support for Young Single Adults and Early-Career Renters:**
+
+Young single-person households consistently face the highest housing cost burden. Policy interventions could include expanding affordable rental housing, introducing rent subsidies or housing vouchers, and incentivizing shared housing options to reduce per-person costs. Programs that facilitate first-time homeownership for young adults, such as low-deposit schemes or government-backed loans, could also alleviate early-career financial strain.
+
+**Assistance for Single-Parent Families:** 
+
+Single-parent households face persistently high housing stress. Policies could target this group through tailored rental assistance, childcare-linked housing support, or income supplements. Increasing access to social housing specifically for single-parent households and ensuring proximity to employment and schools would improve affordability and quality of life.
+
+**Gender-Sensitive Housing Interventions:**
+
+Female-led households experience higher housing stress rates, reflecting income disparities and caregiving responsibilities. Policies should integrate gender-sensitive measures, including income support programs, subsidized rental housing for low-income women, and initiatives to close the gender pay gap. Support for single mothers, such as combined housing and childcare programs, would address intersecting vulnerabilities.
 
 # Limitations and Future Work
 
@@ -440,14 +523,7 @@ Future extensions will include:
 
 This continuation will enable a more complete understanding of housing stress in contemporary Australia.
 
-## Conclusion 
 
-This report provides an evidence-based assessment of housing stress trends in Australia, identifying persistent disparities by age, family structure, and gender.
-Despite modest improvements between 2013 and 2019, key groups — notably lone young adults, single parents, and female-headed households — continue to face disproportionate financial burdens.
-
-The modelling results demonstrate that tenure type, household composition, and dwelling costs are among the most critical predictors of stress. These insights underscore the need for targeted housing policies and financial assistance mechanisms that account for structural inequalities.
-
-Ultimately, addressing housing stress requires a multi-pronged policy approach — one that not only expands affordable supply but also improves financial resilience among vulnerable households.
 
 
 
