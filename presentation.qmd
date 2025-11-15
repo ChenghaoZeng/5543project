@@ -1,0 +1,630 @@
+---
+title: "Housing Stress in Australia: Trends, Drivers, and Insights"
+author: "Chenghao Zeng"
+
+format:
+  revealjs:
+    theme: default
+    width: 1280
+    height: 720
+    center: false
+    transition: slide
+    toc: false
+    progress: true
+    slide-number: true
+---
+
+
+```{r }
+# Setup chunk: install packages if needed (commented by default)
+# install.packages(c("tidyverse","survey","srvyr","scales","glue"))
+
+library(tidyverse)
+library(survey)
+library(srvyr)
+library(scales)
+library(glue)
+library(plotly)
+library(patchwork)
+library(nnet)
+library(dplyr)
+library(tidyr)
+library(car)
+library(brglm2)
+library(logistf)
+library(visreg)
+library(broom)
+library(mice)
+```
+
+```{r}
+#load data
+household <- read_csv("data/CSV/SIH19BH.csv", show_col_types = FALSE)
+income <- read_csv("data/CSV/SIH19BI.csv", show_col_types = FALSE)
+loans <- read_csv("data/CSV/SIH19BL.csv", show_col_types = FALSE)
+person <- read_csv("data/CSV/SIH19BP.csv", show_col_types = FALSE)
+
+#load older data
+household2013 <- read_csv("data/CSV/SIH13BH.csv", show_col_types = FALSE)
+income2013 <- read_csv("data/CSV/SIH13BI.csv", show_col_types = FALSE)
+loans2013 <- read_csv("data/CSV/SIH13BL.csv", show_col_types = FALSE)
+person2013 <- read_csv("data/CSV/SIH13BP.csv", show_col_types = FALSE)
+```
+
+
+```{r}
+#Aggregate loans (household-level debt measures)
+
+loans_agg <- loans %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+
+
+loans_agg2013 <- loans2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#Aggregate IU incomes to household (optional check)
+
+iu_agg <- income %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+    hh_num_ius = n(),
+    .groups = "drop"
+  )
+
+iu_agg2013 <- income2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+    hh_num_ius = n(),
+    .groups = "drop"
+  )
+
+
+```
+
+
+```{r}
+#Extract household-reference-person health (to attach a person-level wellbeing proxy)
+
+person_head <- person %>%
+  filter(HHPOS == 1) %>%     # household reference person
+  select(ABSHID, SAHQ01, AGEEC, SEXP, LVLEDUA) %>%
+  mutate(
+    head_poor_health_flag = case_when(
+      SAHQ01 %in% c(4,5) ~ 1L,  # 4 = Fair, 5 = Poor
+      TRUE ~ 0L
+    )
+  )
+person_head2013 <- person2013 %>%
+  filter(HHPOS == 1) %>%     # household reference person
+  select(ABSHID, DISBPER, AGEBC, SEXP) %>%
+  mutate(
+    head_poor_health_flag = case_when(
+      DISBPER == 2 ~ 1L,
+      TRUE ~ 0L
+    )
+  )
+
+```
+
+```{r}
+#merge tables into a single household dataset
+
+hh_merged <- household %>%
+  left_join(loans_agg, by = "ABSHID") %>%
+  left_join(iu_agg, by = "ABSHID") %>%
+  left_join(person_head, by = "ABSHID")
+
+
+hh_merged2013 <- household2013 %>%
+  left_join(loans_agg2013, by = "ABSHID") %>%
+  left_join(iu_agg2013, by = "ABSHID") %>%
+  left_join(person_head2013, by = "ABSHID")
+
+#rename variables
+rename_map <- c(
+  "SIHHHWT"   = "hh_weight",
+  "HCOSTH8A"  = "weekly_housing_cost_pct",
+  "HCOST10A"  = "weekly_housing_cost_cat",
+  "INCTSCH8"  = "hh_total_weekly_income",
+  "DISPSCH8"  = "hh_weekly_disposable_income",
+  "LIFECYCH"  = "life_cycle_group_code",
+  "DPKIDHBC"  = "num_dependents_under25",
+  "FSTRSS19"  = "num_financial_stress_events",
+  "EMGMONEY"  = "ability_raise_2000_flag"
+)
+
+for(orig in names(rename_map)){
+  if(orig %in% names(hh_merged)){
+    hh_merged <- hh_merged %>% rename(!!rename_map[[orig]] := all_of(orig))
+  }
+}
+
+for(orig in names(rename_map)){
+  if(orig %in% names(hh_merged2013)){
+    hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
+  }
+}
+```
+
+
+
+
+```{r}
+#Recode life-cycle group to readable labels & compute derived vars
+
+hh_merged <- hh_merged %>%
+  mutate(
+    life_cycle_group = case_when(
+      life_cycle_group_code == 0  ~ "Not applicable",
+      life_cycle_group_code == 1  ~ "Lone person <35",
+      life_cycle_group_code == 2  ~ "Couple (ref <35)",
+      life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+      life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+      life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+      life_cycle_group_code == 6  ~ "One parent w dependents",
+      life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+      life_cycle_group_code == 8  ~ "Couple w non-dep only",
+      life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+      life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+      life_cycle_group_code == 11 ~ "Lone person 65+",
+      TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+    ),
+    housing_stress_flag = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 30 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 30 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    housing_stress_flag_20 = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 20 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 20 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    housing_stress_flag_40 = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 40 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 40 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    housing_stress_flag_50 = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 50 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 50 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    ability_raise_2000 = case_when(
+      ability_raise_2000_flag == 1 ~ "Can raise $2000",
+      ability_raise_2000_flag == 5 ~ "Cannot raise $2000",
+      TRUE ~ NA_character_
+    )
+  )
+
+hh_merged2013 <- hh_merged2013 %>%
+  mutate(
+    life_cycle_group = case_when(
+      life_cycle_group_code == 0  ~ "Not applicable",
+      life_cycle_group_code == 1  ~ "Lone person <35",
+      life_cycle_group_code == 2  ~ "Couple (ref <35)",
+      life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+      life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+      life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+      life_cycle_group_code == 6  ~ "One parent w dependents",
+      life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+      life_cycle_group_code == 8  ~ "Couple w non-dep only",
+      life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+      life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+      life_cycle_group_code == 11 ~ "Lone person 65+",
+      TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+    ))
+
+```
+
+
+```{r}
+#Set up survey replicate design (household)
+rep_cols <- grep("^WHS\\d{2}$", names(hh_merged), value = TRUE)
+
+# create srvyr survey object using Fay method (rho = 0.5)
+hh_svy <- hh_merged %>%
+  as_survey_rep(weights = hh_weight,
+                repweights = all_of(rep_cols),
+                type = "Fay",
+                rho = 0.5)
+
+# Set up survey replicate design (household) - SIH 2013
+rep_cols2013 <- grep("^WHS\\d{4}$", names(hh_merged2013), value = TRUE)
+
+# Create srvyr survey object using Fay method (rho = 0.5)
+
+hh_svy2013 <- hh_merged2013 %>%
+  as_survey_rep(
+    weights = hh_weight,          
+    repweights = all_of(rep_cols2013),
+    type = "Fay",
+    rho = 0.5
+  )
+
+```
+
+
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+svy_afford_2013 <- hh_svy2013 %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(afford_ratio = HCOSTSH / hh_income_from_ius)    # ratio in (0, Inf)
+
+svy_afford_2019 <- hh_svy %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(afford_ratio = HCOSTSH / hh_income_from_ius)
+
+# ---- 2) Use survey-aware group summary to get mean ratio (estimate only) ----
+# We use survey_mean(..., vartype = NULL) to request only the estimate column to avoid CI complications.
+summary2013 <- svy_afford_2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(mean_ratio = survey_mean(afford_ratio, vartype = NULL, na.rm = TRUE)) %>%
+  mutate(year = 2013) %>%
+  ungroup()
+
+summary2019 <- svy_afford_2019 %>%
+  group_by(life_cycle_group) %>%
+  summarise(mean_ratio = survey_mean(afford_ratio, vartype = NULL, na.rm = TRUE)) %>%
+  mutate(year = 2019) %>%
+  ungroup()
+
+# ---- 3) Combine and coerce to numeric safely ----
+# The survey_mean result creates a column named "mean_ratio" which should be numeric.
+afford_summary <- bind_rows(summary2013, summary2019) %>%
+# ensure numeric and remove any groups with NA mean
+mutate(mean_ratio = as.numeric(mean_ratio)) %>%
+  filter(!is.na(mean_ratio), life_cycle_group != "Not applicable")
+
+
+# ---- 4) Plot as percentages, show value on top of bars, add 30% reference line ----
+p <- ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 1.2), width = 0.5) +   # <- wider dodge, narrower bars
+  geom_text(aes(label = paste0(round(mean_ratio * 100, 1), "%")),
+            position = position_dodge(width = 1.2),
+            vjust = -0.3, size = 3) +
+  geom_hline(yintercept = 0.30, linetype = "dashed", color = "red") +
+  annotate("text", x = Inf, y = 0.30, label = "30% stress threshold", 
+           hjust = 1.05, vjust = -0.5, color = "red", size = 3) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, NA)) +
+  labs(
+    title = "Mean housing affordability ratio (weekly housing cost ÷ weekly income)\n2013 vs 2019 by life-cycle group",
+    x = "Life-cycle group",
+    y = "Mean housing cost as % of weekly income",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 6),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+ggplotly(p)
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# Proportion of households in housing stress (>30%) by sex group 
+
+# --- 2013 DATA ---
+hh_svy2013 <- hh_svy2013 %>%
+  mutate(
+    sex_group = factor(SEXRH, levels = unique(SEXRH)),
+    sex_group = dplyr::recode(sex_group,
+      `1` = "Male",
+      `2` = "Female"
+    )
+  )
+
+svy_afford_2013 <- hh_svy2013 %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(
+    afford_ratio = HCOSTSH / hh_income_from_ius,
+    housing_stress = afford_ratio > 0.3  # TRUE if ratio > 30%
+  )
+
+summary2013 <- svy_afford_2013 %>%
+  group_by(sex_group) %>%
+  summarise(
+    pct_stress = survey_mean(housing_stress, na.rm = TRUE)
+  ) %>%
+  mutate(year = 2013) %>%
+  ungroup()
+
+# --- 2019 DATA ---
+hh_svy <- hh_svy %>%
+  mutate(
+    sex_group = factor(SEXRH, levels = unique(SEXRH)),
+    sex_group = dplyr::recode(sex_group,
+      `1` = "Male",
+      `2` = "Female"
+    )
+  )
+
+svy_afford_2019 <- hh_svy %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(
+    afford_ratio = HCOSTSH / hh_income_from_ius,
+    housing_stress = afford_ratio > 0.3
+  )
+
+summary2019 <- svy_afford_2019 %>%
+  group_by(sex_group) %>%
+  summarise(
+    pct_stress = survey_mean(housing_stress, na.rm = TRUE)
+  ) %>%
+  mutate(year = 2019) %>%
+  ungroup()
+
+# --- Combine both years ---
+summary_combined <- bind_rows(summary2013, summary2019) %>%
+  mutate(
+    pct = pct_stress * 100
+  )
+
+# --- Visualization ---
+p_stress <- ggplot(summary_combined, aes(
+  x = sex_group,
+  y = pct,
+  fill = factor(year)
+)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "white") +
+  scale_fill_manual(values = c("#4E79A7", "#F28E2B")) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), expand = c(0, 0)) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>30% of Income)",
+    subtitle = "By Sex Group (Comparison: 2013 vs 2019)",
+    x = "Sex group",
+    y = "Percent of households",
+    fill = "Year",
+    caption = "Source: Household Survey Data"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+    axis.text = element_text(color = "gray20"),
+    panel.grid.major.y = element_line(color = "gray85"),
+    panel.grid.minor = element_blank(),
+    plot.caption = element_text(size = 9, color = "gray40", hjust = 1)
+  )
+
+ggplotly(p_stress, tooltip = c("x", "fill", "y"))
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+#Sought financial help from friends/family due to a shortage of money	CFFAMILY
+# 0. Did not seek financial help from friends/family
+# 1. Sought financial help from friends/family
+
+
+#Ability of household to raise $500 emergency money  EMERGMON  0. Not applicable
+# 1. Could raise $500 within a week
+# 5. Could not raise $500 within a week
+# 99. Not stated
+
+
+
+# Extract underlying data frame
+df <- as.data.frame(hh_svy$variables)
+
+# Base data processing
+fam_counts_only <- df %>%
+  select(life_cycle_group, CFFAMILY, EMERGMON) %>%
+  pivot_longer(cols = c(CFFAMILY, EMERGMON),
+               names_to = "variable", values_to = "value") %>%
+  # 💡 Filter: Keep only the CFFAMILY variable
+  filter(variable == "CFFAMILY", value == 1, life_cycle_group != "Not applicable") %>%
+  group_by(life_cycle_group, variable) %>%
+  summarise(count_1 = n(), .groups = "drop") %>%
+  # Rename variable to neat label
+  mutate(variable = dplyr::recode(variable,
+                           CFFAMILY = "Help from family")) %>%
+  filter(count_1 > 0) %>%
+  # Calculate percentages (relative to the total count for Help from family)
+  group_by(variable) %>%
+  mutate(perc = count_1 / sum(count_1) * 100,
+         label = paste0(round(perc, 1), "%"))
+
+em_counts_only <- df %>%
+  select(life_cycle_group, CFFAMILY, EMERGMON) %>%
+  pivot_longer(cols = c(CFFAMILY, EMERGMON),
+               names_to = "variable", values_to = "value") %>%
+  # 💡 Filter: Keep only the EMERGMON variable
+  filter(variable == "EMERGMON", value == 1, life_cycle_group != "Not applicable") %>%
+  group_by(life_cycle_group, variable) %>%
+  summarise(count_1 = n(), .groups = "drop") %>%
+  # Rename variable to neat label
+  mutate(variable = dplyr::recode(variable,
+                           EMERGMON = "Emergency money")) %>%
+  filter(count_1 > 0) %>%
+  # Calculate percentages (relative to the total count for Emergency money)
+  group_by(variable) %>%
+  mutate(perc = count_1 / sum(count_1) * 100,
+         label = paste0(round(perc, 1), "%"))
+
+# Data frame for 'Emergency money'
+em_data <- em_counts_only %>%
+  filter(variable == "Emergency money") %>%
+  mutate(life_cycle_group = droplevels(as.factor(life_cycle_group)))
+
+# Data frame for 'Help from family'
+fam_data <- fam_counts_only  %>%
+  filter(variable == "Help from family") %>%
+  mutate(life_cycle_group = droplevels(as.factor(life_cycle_group)))
+
+plot_native_pie <- function(data, plot_title) {
+  # Ensure the percentages are used for the text display
+  data <- data %>%
+    mutate(life_cycle_group = as.factor(life_cycle_group))
+  
+  plot_ly(data, 
+          labels = ~life_cycle_group, 
+          values = ~count_1, 
+          type = 'pie',
+          # Set the text displayed on the slice, and the hover text
+          text = ~label, 
+          hovertemplate = paste('<b>%{label}</b><br>',
+                                '%{value}<extra></extra>'),
+          textinfo = 'text',
+          insidetextfont = list(color = '#FFFFFF', size = 10),
+          # RColorBrewer must be installed/loaded for this color line
+          marker = list(line = list(color = '#FFFFFF', width = 1)),
+          name = plot_title,
+          domain = list(x = c(0, 1), y = c(0, 1))) %>% 
+    layout(title = list(text = plot_title, font = list(size = 13)),
+           showlegend = TRUE)
+}
+
+# --- GENERATE AND PRINT INTERACTIVE PLOTS ---
+
+# 1. Generate the individual INTERACTIVE plots
+# Note: Use plot_native_pie, NOT plot_pie
+plot_em_interactive <- plot_native_pie(em_data, "No enough Emergency money")
+plot_fam_interactive <- plot_native_pie(fam_data, "Need financial Help from family")
+
+# 2. Print the Emergency Money interactive plot
+print(plot_em_interactive)
+
+# 3. Print the Help from Family interactive plot
+print(plot_fam_interactive)
+```
+
+## Aim for this presentation
+
+- Explore how housing stress has changed over time in Australia
+
+- Identify which groups are most affected
+
+- Analyse key factors driving housing stress
+
+- Develop clear visual tools 
+
+- Propose evidence-based policy directions for the future
+
+- Further improvment for this project
+
+
+
+## What is Housing Stress?
+
+- Defined as spending **>30% of household weekly income on weekly housing costs**  
+- reflects **financial vulnerability**  
+
+[ABC News (2024)](https://www.abc.net.au/news/2024-05-15/federal-budget-housing-crisis-in-10-graphs/103847336): Rising housing stress in Australia since 2000s.
+
+
+
+
+
+
+## Housing Burden by Life-Cycle Group (2013 vs 2019)
+
+
+```{r}
+ggplotly(p)
+```
+
+
+
+## Dependence on Family Financial Support
+```{r}
+plot_fam_interactive
+```
+
+
+
+## Gender Differences in Housing Stress
+```{r}
+ggplotly(p_stress, tooltip = c("x", "fill", "y"))
+```
+
+
+## Model Setup Preview: 
+
+$$
+\text{logit}\big(P(\text{HousingStress} = 1)\big) = \\
+\beta_0 
++ \beta_1 \cdot \text{Life_Cycle_Group} 
++ \beta_2 \cdot \text{Household_Size} \\
++ \beta_3 \cdot \text{Education_Level} 
++ \beta_4 \cdot \text{Age_Youngest_Child} \\
++ \beta_5 \cdot \text{State} 
++ \beta_6 \cdot \text{Tenure_type} 
++ \beta_7 \cdot \text{Purchase_price_dwelling}  \\ 
++ \beta_8 \cdot \text{sex_group} 
++ \beta_{10} \cdot \text{hh_total_weekly_repayments}\\
+$$
+
+
+
+## Key Predictor Interpretations 
+
+1. <span style="color:#2E86C1;"><b>Household Size</b></span>:  
+Larger households reduce housing stress  (<span style="color:#2E86C1;"><b>1</b></span>-person increase → ~ <span style="color:#2E86C1;"><b>1.8%</b></span> lower odds).
+
+2. <span style="color:#2E86C1;"><b>Age of Youngest Child</b></span>:  
+Older children may slightly lower stress (<span style="color:#2E86C1;"><b>1</b></span> year older → ~<span style="color:#2E86C1;"><b>1.2%</b></span> lower odds).
+
+3. <span style="color:#2E86C1;"><b>Purchase Price of Dwelling</b></span>:
+Higher dwelling purchase price increase stress  (<span style="color:#2E86C1;"><b>$100,000</b></span> increase → ~<span style="color:#2E86C1;"><b>1.3%</b></span> higher odds).
+
+4. <span style="color:#2E86C1;"><b>Tenure Type</b></span>:
+Compared to owners with no mortgage —
+-  Owners with mortgage: ~<span style="color:#2E86C1;"><b>6%</b></span> higher odds of stress.
+-  Pivate renters: ~ <span style="color:#2E86C1;"><b>2.1%</b></span> higher odds of stress.
+
+
+
+## Conclusion and Recommendations:
+
+<span style="color:#2E86C1;"><b>Conclusion</b></span>:
+
+Lone person under 35, families with dependents, and females remain most vulnerable due to rising housing costs and limited financial buffers.
+
+
+<span style="color:#2E86C1;"><b>Recommendations</b></span>:
+
+1. Expand Social & Affordable Housing  
+
+- provide more social housing that are affordable to young adults. 
+
+2. Targeted Financial Assistance  
+
+- focus on groups most exposed to housing cost burdens.
+
+
+
+## Limitations & Future Directions
+
+<span style="color:#2E86C1;"><b>Current Limitation </b></span>
+
+- Data cutoff: 2019 (pre-COVID-19)  
+- Missing post-2020 changes: Interest rate hikes, rent surges, living cost increases  
+
+<span style="color:#2E86C1;"><b>Future Work Plan</b></span>  
+
+- Update analysis with 2020+ data to track post-pandemic trends  
+- Add new variables: Remote work impact, interest rate fluctuations
+
+

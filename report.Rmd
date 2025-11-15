@@ -1,0 +1,1559 @@
+---
+title: |
+  <div style="text-align:center;">
+    <strong>Housing Stress in Australia: Trends, Drivers, and Insights</strong><br>
+    <strong>Word Count: 5017</strong>
+  </div>
+author: |
+  | Author: Chenghao Zeng
+  | Supervisor: Rebecca Valenzuela, Australian Institute of Family Studies
+date: "25/10/2025"
+output: 
+  rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, 
+                      message=FALSE,
+                      error = FALSE,
+                      warning=FALSE,
+                      eval= TRUE,
+                      results = 'hide', 
+                      fig.align = "center")
+```
+
+```{r include=FALSE}
+
+library(tidyverse)
+library(survey)
+library(srvyr)
+library(scales)
+library(glue)
+library(plotly)
+library(patchwork)
+library(nnet)
+library(dplyr)
+library(tidyr)
+library(car)
+library(brglm2)
+library(logistf)
+library(visreg)
+library(broom)
+library(mice)
+```
+
+
+```{r}
+#load data
+household <- read_csv("data/CSV/SIH19BH.csv", show_col_types = FALSE)
+income <- read_csv("data/CSV/SIH19BI.csv", show_col_types = FALSE)
+loans <- read_csv("data/CSV/SIH19BL.csv", show_col_types = FALSE)
+person <- read_csv("data/CSV/SIH19BP.csv", show_col_types = FALSE)
+
+#load older data
+household2013 <- read_csv("data/CSV/SIH13BH.csv", show_col_types = FALSE)
+income2013 <- read_csv("data/CSV/SIH13BI.csv", show_col_types = FALSE)
+loans2013 <- read_csv("data/CSV/SIH13BL.csv", show_col_types = FALSE)
+person2013 <- read_csv("data/CSV/SIH13BP.csv", show_col_types = FALSE)
+```
+
+
+```{r}
+#Aggregate loans (household-level debt measures)
+
+loans_agg <- loans %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+
+
+loans_agg2013 <- loans2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#Aggregate IU incomes to household (optional check)
+
+iu_agg <- income %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+    hh_num_ius = n(),
+    .groups = "drop"
+  )
+
+iu_agg2013 <- income2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+    hh_num_ius = n(),
+    .groups = "drop"
+  )
+
+
+```
+
+
+```{r}
+#Extract household-reference-person health (to attach a person-level wellbeing proxy)
+
+person_head <- person %>%
+  filter(HHPOS == 1) %>%     # household reference person
+  select(ABSHID, SAHQ01, AGEEC, SEXP, LVLEDUA) %>%
+  mutate(
+    head_poor_health_flag = case_when(
+      SAHQ01 %in% c(4,5) ~ 1L,  # 4 = Fair, 5 = Poor
+      TRUE ~ 0L
+    )
+  )
+person_head2013 <- person2013 %>%
+  filter(HHPOS == 1) %>%     # household reference person
+  select(ABSHID, DISBPER, AGEBC, SEXP) %>%
+  mutate(
+    head_poor_health_flag = case_when(
+      DISBPER == 2 ~ 1L,
+      TRUE ~ 0L
+    )
+  )
+
+```
+
+```{r}
+#merge tables into a single household dataset
+
+hh_merged <- household %>%
+  left_join(loans_agg, by = "ABSHID") %>%
+  left_join(iu_agg, by = "ABSHID") %>%
+  left_join(person_head, by = "ABSHID")
+
+
+hh_merged2013 <- household2013 %>%
+  left_join(loans_agg2013, by = "ABSHID") %>%
+  left_join(iu_agg2013, by = "ABSHID") %>%
+  left_join(person_head2013, by = "ABSHID")
+
+#rename variables
+rename_map <- c(
+  "SIHHHWT"   = "hh_weight",
+  "HCOSTH8A"  = "weekly_housing_cost_pct",
+  "HCOST10A"  = "weekly_housing_cost_cat",
+  "INCTSCH8"  = "hh_total_weekly_income",
+  "DISPSCH8"  = "hh_weekly_disposable_income",
+  "LIFECYCH"  = "life_cycle_group_code",
+  "DPKIDHBC"  = "num_dependents_under25",
+  "FSTRSS19"  = "num_financial_stress_events",
+  "EMGMONEY"  = "ability_raise_2000_flag"
+)
+
+for(orig in names(rename_map)){
+  if(orig %in% names(hh_merged)){
+    hh_merged <- hh_merged %>% rename(!!rename_map[[orig]] := all_of(orig))
+  }
+}
+
+for(orig in names(rename_map)){
+  if(orig %in% names(hh_merged2013)){
+    hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
+  }
+}
+```
+
+
+
+
+```{r}
+#Recode life-cycle group to readable labels & compute derived vars
+
+hh_merged <- hh_merged %>%
+  mutate(
+    life_cycle_group = case_when(
+      life_cycle_group_code == 0  ~ "Not applicable",
+      life_cycle_group_code == 1  ~ "Lone person <35",
+      life_cycle_group_code == 2  ~ "Couple (ref <35)",
+      life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+      life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+      life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+      life_cycle_group_code == 6  ~ "One parent w dependents",
+      life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+      life_cycle_group_code == 8  ~ "Couple w non-dep only",
+      life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+      life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+      life_cycle_group_code == 11 ~ "Lone person 65+",
+      TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+    ),
+    housing_stress_flag = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 30 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 30 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    housing_stress_flag_20 = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 20 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 20 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    housing_stress_flag_40 = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 40 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 40 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    housing_stress_flag_50 = case_when(
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 50 ~ 1L,
+      !is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 50 ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    ability_raise_2000 = case_when(
+      ability_raise_2000_flag == 1 ~ "Can raise $2000",
+      ability_raise_2000_flag == 5 ~ "Cannot raise $2000",
+      TRUE ~ NA_character_
+    )
+  )
+
+hh_merged2013 <- hh_merged2013 %>%
+  mutate(
+    life_cycle_group = case_when(
+      life_cycle_group_code == 0  ~ "Not applicable",
+      life_cycle_group_code == 1  ~ "Lone person <35",
+      life_cycle_group_code == 2  ~ "Couple (ref <35)",
+      life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+      life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+      life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+      life_cycle_group_code == 6  ~ "One parent w dependents",
+      life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+      life_cycle_group_code == 8  ~ "Couple w non-dep only",
+      life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+      life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+      life_cycle_group_code == 11 ~ "Lone person 65+",
+      TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+    ))
+
+```
+
+
+```{r}
+#Set up survey replicate design (household)
+rep_cols <- grep("^WHS\\d{2}$", names(hh_merged), value = TRUE)
+
+# create srvyr survey object using Fay method (rho = 0.5)
+hh_svy <- hh_merged %>%
+  as_survey_rep(weights = hh_weight,
+                repweights = all_of(rep_cols),
+                type = "Fay",
+                rho = 0.5)
+
+# Set up survey replicate design (household) - SIH 2013
+rep_cols2013 <- grep("^WHS\\d{4}$", names(hh_merged2013), value = TRUE)
+
+# Create srvyr survey object using Fay method (rho = 0.5)
+
+hh_svy2013 <- hh_merged2013 %>%
+  as_survey_rep(
+    weights = hh_weight,          
+    repweights = all_of(rep_cols2013),
+    type = "Fay",
+    rho = 0.5
+  )
+
+```
+
+
+```{r}
+# Proportion of households in housing stress (>30%) by life-cycle group
+stress_by_life <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life %>% collect() %>% print(n = Inf)
+
+
+# Proportion of households in housing stress (>20%) by life-cycle group
+stress_by_life_20 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag_20, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life_20 %>% collect() %>% print(n = Inf)
+
+
+# Proportion of households in housing stress (>40%) by life-cycle group
+stress_by_life_40 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag_40, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life_40 %>% collect() %>% print(n = Inf)
+
+# Proportion of households in housing stress (>50%) by life-cycle group
+stress_by_life_50 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarize(
+    pct_stress = survey_mean(housing_stress_flag_50, vartype = c("ci","se"), na.rm = TRUE)
+  ) %>%
+  arrange(desc(pct_stress))
+
+stress_by_life_50 %>% collect() %>% print(n = Inf)
+```
+
+
+```{r}
+plot1_df <- stress_by_life %>%
+  collect() %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
+  ) %>%
+  arrange(pct) %>%
+  mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
+
+p1 <- ggplot(plot1_df, aes(x = life_cycle_group, y = pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>30% housing costs)",
+    x = "Life-cycle group",
+    y = "Percent of households (weighted, 95% CI)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 10)   
+  )
+
+# Save plot
+ggsave("plot_housing_stress_by_lifecycle.png", p1, width = 10, height = 6, dpi = 300)
+
+
+plot2_df <- stress_by_life_20 %>%
+  collect() %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
+  ) %>%
+  arrange(pct) %>%
+  mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
+
+p2 <- ggplot(plot2_df, aes(x = life_cycle_group, y = pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>20% housing costs)",
+    x = "Life-cycle group",
+    y = "Percent of households (weighted, 95% CI)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 10)   
+  )
+
+plot3_df <- stress_by_life_40 %>%
+  collect() %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
+  ) %>%
+  arrange(pct) %>%
+  mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
+
+p3 <- ggplot(plot3_df, aes(x = life_cycle_group, y = pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>40% housing costs)",
+    x = "Life-cycle group",
+    y = "Percent of households (weighted, 95% CI)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 10)   
+  )
+
+
+plot4_df <- stress_by_life_50 %>%
+  collect() %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up  = pct_stress_upp * 100
+  ) %>%
+  arrange(pct) %>%
+  mutate(life_cycle_group = factor(life_cycle_group, levels = unique(life_cycle_group)))
+
+p4 <- ggplot(plot4_df, aes(x = life_cycle_group, y = pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = up), width = 0.2) +
+  coord_flip() +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>50% housing costs)",
+    x = "Life-cycle group",
+    y = "Percent of households (weighted, 95% CI)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 10)   
+  )
+
+# Print to the HTML output
+ggplotly(p1)
+ggplotly(p2)
+ggplotly(p3)
+ggplotly(p4)
+
+```
+
+
+
+```{r}
+#Quick comparison: single-parent households vs others
+
+single_parent_summary <- hh_svy %>%
+  mutate(is_single_parent = (life_cycle_group == "One parent w dependents")) %>%
+  group_by(is_single_parent) %>%
+  summarize(
+    pct_in_stress = survey_mean(housing_stress_flag, vartype = c("ci","se"), na.rm = TRUE),
+    mean_hc_pct = survey_mean(weekly_housing_cost_pct, vartype = c("ci","se"), na.rm = TRUE)
+  )
+
+single_parent_summary %>% collect() %>% print()
+
+```
+
+
+```{r}
+# --- State code mapping ---
+state_labels <- c(
+  "1" = "New South Wales",
+  "2" = "Victoria",
+  "3" = "Queensland",
+  "4" = "South Australia",
+  "5" = "Western Australia",
+  "6" = "Tasmania",
+  "7" = "Northern Territory",
+  "8" = "Australian Capital Territory",
+  "9" = "Other Territories"
+)
+
+purchase2013 <- hh_svy2013 %>%
+  filter(!is.na(HVALPRIC), HVALPRIC > 0) %>%
+  group_by(STATEHBC) %>%
+  summarise(avg_price = survey_mean(HVALPRIC, na.rm = TRUE)) %>%
+  mutate(
+    year = 2013,
+    STATE = state_labels[as.character(STATEHBC)]
+  )
+  
+
+
+purchase2019 <- hh_svy %>%
+  filter(!is.na(HVALPRIC), HVALPRIC > 0) %>%
+  group_by(STATEHEC) %>%
+  summarise(avg_price = survey_mean(HVALPRIC, na.rm = TRUE)) %>%
+  mutate(
+    year = 2019,
+    STATE = state_labels[as.character(STATEHEC)]
+  )
+
+# --- Combine ---
+purchase_compare <- bind_rows(purchase2013, purchase2019) 
+
+
+p_price <- ggplot(purchase_compare, aes(x = year, y = avg_price/1000, group = STATE, color = STATE)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  # Note: I'm removing geom_text here as plotly handles tooltips better, 
+  # but you can leave it if you want fixed labels.
+  labs(
+    title = "Trend in Average dwelling purchase prices by State (2013 to 2019)",
+    x = "Year",
+    y = "Average purchase price ($'000s)",
+    color = "State"
+  ) +
+  scale_x_continuous(breaks = unique(purchase_compare$year)) +
+  theme_minimal(base_size = 9) +
+  theme(
+    plot.title = element_text(size = 10, face = "bold")
+  )
+
+ggplotly(p_price)
+```
+
+
+
+
+
+```{r}
+#Weekly housing costs (SIHC basis) - HH	HCOSTSH
+
+# --- Compute weighted means only ---
+cost_summary2013 <- hh_svy2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_cost = survey_mean(HCOSTSH, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2013)
+
+cost_summary2019 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_cost = survey_mean(HCOSTSH, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2019)
+
+# --- Combine ---
+cost_summary <- bind_rows(cost_summary2013, cost_summary2019)
+
+# Ensure numeric (in case survey_mean makes it list-like)
+cost_summary <- cost_summary %>%
+  mutate(mean_cost = as.numeric(mean_cost)) %>% 
+  filter(life_cycle_group != "Not applicable")
+
+
+
+p_cost <- ggplot(cost_summary, aes(x = life_cycle_group, y = mean_cost, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  # Note: The fixed geom_text labels will still be present, but plotly's
+  # tooltips provide a cleaner interactive experience.
+  geom_text(aes(label = paste0("$", round(mean_cost))),
+            position = position_dodge(width = 0.8),
+            vjust = -0.3, size = 3) +
+  labs(
+    title = "Weekly housing costs across life-cycle groups (2013 vs 2019)",
+    x = "Life-cycle group",
+    y = "Mean weekly housing cost ($)",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 8),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+ggplotly(p_cost)
+```
+
+
+```{r}
+#Total current weekly IU income from all sources	INCTSCU8
+# --- Weighted mean income 2013 ---
+income_summary2013 <- hh_svy2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_income = survey_mean(hh_income_from_ius, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2013)
+
+# --- Weighted mean income 2019 ---
+income_summary2019 <- hh_svy %>%
+  group_by(life_cycle_group) %>%
+  summarise(
+    mean_income = survey_mean(hh_income_from_ius, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = 2019)
+
+# --- Combine ---
+income_summary <- bind_rows(income_summary2013, income_summary2019)
+
+# Ensure numeric (survey_mean sometimes returns labelled structure)
+income_summary <- income_summary %>%
+  mutate(mean_income = as.numeric(mean_income)) %>% 
+  filter(life_cycle_group != "Not applicable")
+
+
+p_income <- ggplot(income_summary, aes(x = life_cycle_group, y = mean_income, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = paste0("$", round(mean_income))),
+            position = position_dodge(width = 0.8),
+            vjust = -0.3, size = 3) +
+  labs(
+    title = "Weekly household income across life-cycle groups (2013 vs 2019)",
+    x = "Life-cycle group",
+    y = "Mean weekly income ($)",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 8),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+ggplotly(p_income)
+```
+
+```{r}
+svy_afford_2013 <- hh_svy2013 %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(afford_ratio = HCOSTSH / hh_income_from_ius)    # ratio in (0, Inf)
+
+svy_afford_2019 <- hh_svy %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(afford_ratio = HCOSTSH / hh_income_from_ius)
+
+# ---- 2) Use survey-aware group summary to get mean ratio (estimate only) ----
+# We use survey_mean(..., vartype = NULL) to request only the estimate column to avoid CI complications.
+summary2013 <- svy_afford_2013 %>%
+  group_by(life_cycle_group) %>%
+  summarise(mean_ratio = survey_mean(afford_ratio, vartype = NULL, na.rm = TRUE)) %>%
+  mutate(year = 2013) %>%
+  ungroup()
+
+summary2019 <- svy_afford_2019 %>%
+  group_by(life_cycle_group) %>%
+  summarise(mean_ratio = survey_mean(afford_ratio, vartype = NULL, na.rm = TRUE)) %>%
+  mutate(year = 2019) %>%
+  ungroup()
+
+# ---- 3) Combine and coerce to numeric safely ----
+# The survey_mean result creates a column named "mean_ratio" which should be numeric.
+afford_summary <- bind_rows(summary2013, summary2019) %>%
+# ensure numeric and remove any groups with NA mean
+mutate(mean_ratio = as.numeric(mean_ratio)) %>%
+  filter(!is.na(mean_ratio), life_cycle_group != "Not applicable")
+
+
+# ---- 4) Plot as percentages, show value on top of bars, add 30% reference line ----
+p_afford <- ggplot(afford_summary, aes(x = life_cycle_group, y = mean_ratio, fill = factor(year))) +
+  geom_col(position = position_dodge(width = 1.2), width = 0.5) +   # <- wider dodge, narrower bars
+  geom_text(aes(label = paste0(round(mean_ratio * 100, 1), "%")),
+            position = position_dodge(width = 1.2),
+            vjust = -0.3, size = 3) +
+  geom_hline(yintercept = 0.30, linetype = "dashed", color = "red") +
+  annotate("text", x = Inf, y = 0.30, label = "30% stress threshold", 
+           hjust = 1.05, vjust = -0.5, color = "red", size = 3) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, NA)) +
+  labs(
+    title = "Mean housing affordability ratio (weekly housing cost ÷ weekly income)\n2013 vs 2019 by life-cycle group",
+    x = "Life-cycle group",
+    y = "Mean housing cost as % of weekly income",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 6),
+    plot.title = element_text(size = 11, face = "bold")
+  )
+
+ggplotly(p_afford)
+```
+
+
+
+```{r}
+# Proportion of households in housing stress (>30%) by sex group 
+
+# --- 2013 DATA ---
+hh_svy2013 <- hh_svy2013 %>%
+  mutate(
+    sex_group = factor(SEXRH, levels = unique(SEXRH)),
+    sex_group = dplyr::recode(sex_group,
+      `1` = "Male",
+      `2` = "Female"
+    )
+  )
+
+svy_afford_2013 <- hh_svy2013 %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(
+    afford_ratio = HCOSTSH / hh_income_from_ius,
+    housing_stress = afford_ratio > 0.3  # TRUE if ratio > 30%
+  )
+
+summary2013 <- svy_afford_2013 %>%
+  group_by(sex_group) %>%
+  summarise(
+    pct_stress = survey_mean(housing_stress, vartype = c("ci", "se"), na.rm = TRUE)
+  ) %>%
+  mutate(year = 2013) %>%
+  ungroup()
+
+# --- 2019 DATA ---
+hh_svy <- hh_svy %>%
+  mutate(
+    sex_group = factor(SEXRH, levels = unique(SEXRH)),
+    sex_group = dplyr::recode(sex_group,
+      `1` = "Male",
+      `2` = "Female"
+    )
+  )
+
+svy_afford_2019 <- hh_svy %>%
+  filter(!is.na(HCOSTSH), !is.na(hh_income_from_ius), hh_income_from_ius > 0) %>%
+  mutate(
+    afford_ratio = HCOSTSH / hh_income_from_ius,
+    housing_stress = afford_ratio > 0.3
+  )
+
+summary2019 <- svy_afford_2019 %>%
+  group_by(sex_group) %>%
+  summarise(
+    pct_stress = survey_mean(housing_stress, vartype = c("ci", "se"), na.rm = TRUE)
+  ) %>%
+  mutate(year = 2019) %>%
+  ungroup()
+
+# --- Combine both years ---
+summary_combined <- bind_rows(summary2013, summary2019) %>%
+  mutate(
+    pct = pct_stress * 100,
+    low = pct_stress_low * 100,
+    up = pct_stress_upp * 100
+  )
+
+# --- Visualization ---
+p_stress <- ggplot(summary_combined, aes(
+  x = sex_group,
+  y = pct,
+  fill = factor(year)
+)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "white") +
+  geom_errorbar(
+    aes(ymin = low, ymax = up),
+    width = 0.2,
+    position = position_dodge(width = 0.8),
+    color = "black"
+  ) +
+  scale_fill_manual(values = c("#4E79A7", "#F28E2B")) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), expand = c(0, 0)) +
+  labs(
+    title = "Proportion of Households in Housing Stress (>30% of Income)",
+    subtitle = "By Sex Group (Comparison: 2013 vs 2019)",
+    x = "Sex group",
+    y = "Percent of households (weighted, 95% CI)",
+    fill = "Year",
+    caption = "Source: Household Survey Data"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+    axis.text = element_text(color = "gray20"),
+    panel.grid.major.y = element_line(color = "gray85"),
+    panel.grid.minor = element_blank(),
+    plot.caption = element_text(size = 9, color = "gray40", hjust = 1)
+  )
+
+ggplotly(p_stress, tooltip = c("x", "fill", "y"))
+```
+
+
+
+```{r}
+#Sought financial help from friends/family due to a shortage of money	CFFAMILY
+# 0. Did not seek financial help from friends/family
+# 1. Sought financial help from friends/family
+
+
+#Ability of household to raise $500 emergency money  EMERGMON  0. Not applicable
+# 1. Could raise $500 within a week
+# 5. Could not raise $500 within a week
+# 99. Not stated
+
+
+
+# Extract underlying data frame
+df <- as.data.frame(hh_svy$variables)
+
+# Base data processing
+fam_counts_only <- df %>%
+  select(life_cycle_group, CFFAMILY, EMERGMON) %>%
+  pivot_longer(cols = c(CFFAMILY, EMERGMON),
+               names_to = "variable", values_to = "value") %>%
+  # 💡 Filter: Keep only the CFFAMILY variable
+  filter(variable == "CFFAMILY", value == 1, life_cycle_group != "Not applicable") %>%
+  group_by(life_cycle_group, variable) %>%
+  summarise(count_1 = n(), .groups = "drop") %>%
+  # Rename variable to neat label
+  mutate(variable = dplyr::recode(variable,
+                           CFFAMILY = "Help from family")) %>%
+  filter(count_1 > 0) %>%
+  # Calculate percentages (relative to the total count for Help from family)
+  group_by(variable) %>%
+  mutate(perc = count_1 / sum(count_1) * 100,
+         label = paste0(round(perc, 1), "%"))
+
+em_counts_only <- df %>%
+  select(life_cycle_group, CFFAMILY, EMERGMON) %>%
+  pivot_longer(cols = c(CFFAMILY, EMERGMON),
+               names_to = "variable", values_to = "value") %>%
+  # 💡 Filter: Keep only the EMERGMON variable
+  filter(variable == "EMERGMON", value == 1, life_cycle_group != "Not applicable") %>%
+  group_by(life_cycle_group, variable) %>%
+  summarise(count_1 = n(), .groups = "drop") %>%
+  # Rename variable to neat label
+  mutate(variable = dplyr::recode(variable,
+                           EMERGMON = "Emergency money")) %>%
+  filter(count_1 > 0) %>%
+  # Calculate percentages (relative to the total count for Emergency money)
+  group_by(variable) %>%
+  mutate(perc = count_1 / sum(count_1) * 100,
+         label = paste0(round(perc, 1), "%"))
+
+# Data frame for 'Emergency money'
+em_data <- em_counts_only %>%
+  filter(variable == "Emergency money") %>%
+  mutate(life_cycle_group = droplevels(as.factor(life_cycle_group)))
+
+# Data frame for 'Help from family'
+fam_data <- fam_counts_only  %>%
+  filter(variable == "Help from family") %>%
+  mutate(life_cycle_group = droplevels(as.factor(life_cycle_group)))
+
+plot_native_pie <- function(data, plot_title) {
+  # Ensure the percentages are used for the text display
+  data <- data %>%
+    mutate(life_cycle_group = as.factor(life_cycle_group))
+  
+  plot_ly(data, 
+          labels = ~life_cycle_group, 
+          values = ~count_1, 
+          type = 'pie',
+          # Set the text displayed on the slice, and the hover text
+          text = ~label, 
+          hovertemplate = paste('<b>%{label}</b><br>',
+                                '%{value}<extra></extra>'),
+          textinfo = 'text',
+          insidetextfont = list(color = '#FFFFFF', size = 10),
+          # RColorBrewer must be installed/loaded for this color line
+          marker = list(line = list(color = '#FFFFFF', width = 1)),
+          name = plot_title,
+          domain = list(x = c(0, 1), y = c(0, 1))) %>% 
+    layout(title = list(text = plot_title, font = list(size = 13)),
+           showlegend = TRUE)
+}
+
+# --- GENERATE AND PRINT INTERACTIVE PLOTS ---
+
+# 1. Generate the individual INTERACTIVE plots
+# Note: Use plot_native_pie, NOT plot_pie
+plot_em_interactive <- plot_native_pie(em_data, "No enough Emergency money")
+plot_fam_interactive <- plot_native_pie(fam_data, "Need financial Help from family")
+
+# 2. Print the Emergency Money interactive plot
+print(plot_em_interactive)
+
+# 3. Print the Help from Family interactive plot
+print(plot_fam_interactive)
+```
+
+
+
+
+
+```{r}
+#Weekly housing costs (broad) as a percentage of gross hh income (exc RA) ranges: weekly_housing_cost_cat
+#Number of persons in household:	PERSHBC
+#Level of highest educational attainment: LVLEDUA
+#Tenure type - HH: TENURECF
+#Age of youngest dependent child in household:	AGEKIDH
+#State or Territory of usual residence 2016: STATEHEC
+#Purchase price of dwelling (for dwellings purchased/built in the previous 3 years):HVALPRIC
+#sex_group
+#Number of dependent children aged under 15 years in household: NUMU15BC
+
+set.seed(123)
+
+explore2019<- svy_afford_2019 %>%
+  select(
+    HousingCostRatio_Range = weekly_housing_cost_cat,
+    Life_Cycle_Group       = life_cycle_group, 
+    Household_Size         = PERSHBC,
+    Education_Level        = LVLEDUA,
+    Age_Youngest_Child     = AGEKIDH,
+    State                  = STATEHEC,
+    Tenure_type            = TENURECF,
+    Purchase_price_dwelling= HVALPRIC,
+    sex_group
+  ) %>%
+   # Filter out Tenure type == 0 (Not applicable)
+  filter(Tenure_type != 0)  %>%
+  # Replace 999 in Age_Youngest_Child with mean of valid ages (0–24)
+  mutate(Age_Youngest_Child = ifelse(
+      Age_Youngest_Child == 999,
+      mean(Age_Youngest_Child[Age_Youngest_Child != 999], na.rm = TRUE),
+      Age_Youngest_Child
+    ),
+    #convert into factor vars
+    State = as.factor(State),
+    Tenure_type = as.factor(Tenure_type),
+    Education_Level = as.factor(Education_Level),
+    # Recode Weekly housing cost ratio variable:
+    # 0 if <3 (less than 30% of income), 1 if >=3 (more than 30%)
+    HousingStress = ifelse(HousingCostRatio_Range < 3, 0, 1))
+    
+# check missingness
+na_counts <- explore2019 %>%
+  summarise(
+    across(everything(), ~ sum(is.na(.)))  
+  )
+t(na_counts)
+explore2019_df <- as.data.frame(explore2019)
+imputed_data <- mice(
+  data = explore2019_df,
+  m = 5,  
+  maxit = 50,
+  method = "pmm",  #use prediction mean match
+  printFlag = FALSE
+)
+explore2019_imputed <- complete(imputed_data, action = 1)
+```
+
+
+
+```{r}
+
+
+model <- glm(HousingStress ~ Life_Cycle_Group + Household_Size + 
+                     Education_Level + Age_Youngest_Child + State + Tenure_type + 
+                     Purchase_price_dwelling + sex_group,  
+                       data = explore2019_imputed,
+                       family = binomial(link = "logit")) %>% 
+  step(trace=FALSE)
+summary(model)
+car::vif(model)
+```
+
+
+```{r}
+# --- Assumes `model` (fitted glm from explore2019_imputed) already exists ---
+# e.g. model <- glm(..., data = explore2019_imputed, family = binomial(link = "logit")) %>% step(trace = FALSE)
+
+# 1. compute Cook's distances
+cooks_d <- cooks.distance(model)
+
+# 2. summary and diagnostics
+summary(cooks_d)
+n <- nrow(explore2019_imputed)
+p <- length(coef(model))                # number of parameters (including intercept)
+
+# Two common thresholds:
+threshold_4_over_n_minus_p <- 4 / (n - p)   # conservative threshold using model degrees of freedom
+threshold_4_over_n         <- 4 / n         # simpler rule-of-thumb
+
+cat("n =", n, " p =", p, "\n")
+cat("Threshold (4/(n-p)) =", round(threshold_4_over_n_minus_p, 6), "\n")
+cat("Threshold (4/n)       =", round(threshold_4_over_n, 6), "\n")
+
+# 3. identify influential observations (using the chosen threshold)
+influential_idx <- which(cooks_d > threshold_4_over_n_minus_p)
+length(influential_idx)   # how many flagged
+
+# show top influential observations
+top_idx <- order(cooks_d, decreasing = TRUE)[1:20]  # top 20 by Cook's D
+data.frame(index = top_idx, cooks = round(cooks_d[top_idx], 6))
+
+# if there is a household identifier e.g. ABSHID, show it
+if("ABSHID" %in% names(explore2019_imputed)){
+  cat("ABSHID of flagged observations:\n")
+  print(explore2019_imputed$ABSHID[influential_idx])
+}
+
+# 4. plot Cook's distances for visual inspection
+# c_dis <- plot(cooks_d, type = "h", ylab = "Cook's distance", main = "Cook's distance (influential obs)")
+# abline(h = threshold_4_over_n_minus_p, col = "red", lty = 2)
+# abline(h = threshold_4_over_n, col = "blue", lty = 3)
+# legend("topright", legend = c("4/(n-p)", "4/n"), col = c("red", "blue"), lty = c(2,3))
+# 
+# # Add labels for the largest points (optional)
+# largest <- order(cooks_d, decreasing = TRUE)[1:10]
+# text(x = largest, y = cooks_d[largest], labels = largest, pos = 3, cex = 0.8)
+
+# 5. Inspect rows flagged before removing (recommended)
+if(length(influential_idx) > 0){
+  head(explore2019_imputed[influential_idx, ], n = 10)   # view first 10 influential rows
+} else {
+  cat("No influential observations found using this threshold.\n")
+}
+
+# 6. Remove influential observations and create cleaned dataset
+#    (If none found, this will simply copy the original)
+explore2019_imputed_clean <- explore2019_imputed
+if(length(influential_idx) > 0){
+  explore2019_imputed_clean <- explore2019_imputed[-influential_idx, ]
+}
+
+# 7. Refit the model on the cleaned dataset
+model_formula <- formula(model)   # capture the selected/formula from the original model
+model_clean <- glm(HousingStress ~ 
+    # original vars
+    Life_Cycle_Group + Education_Level + Age_Youngest_Child + 
+    State + Tenure_type + sex_group +
+    # add non-linear term
+    I(scale(Purchase_price_dwelling)^2) + I(Household_Size^2),   
+  data = explore2019_imputed_clean,
+  family = binomial(link = "logit")
+)
+
+# Optionally re-run stepwise selection if the original used step()
+# model_clean <- step(model_clean, trace = FALSE)
+
+# 8. Compare original vs cleaned model
+cat("Original model AIC:", AIC(model), "\n")
+cat("Cleaned  model AIC:", AIC(model_clean), "\n")
+
+# If models are nested, likelihood-ratio test can be informative:
+# (Note: if step selection changed the formula, anova test may be invalid)
+# anova(model, model_clean, test = "Chisq")
+
+# 9. Summaries and multicollinearity check
+summary(model_clean)
+car::vif(model_clean)
+
+```
+
+
+```{r}
+#Diagnostics 
+aug <- augment(model_clean)
+
+p_residual <- ggplot(aug, aes(x=.fitted, y=.resid)) +
+geom_point() + geom_smooth()
+```
+
+# Git Repo Link: https://github.com/ChenghaoZeng/5543project/tree/main
+
+# Abstract
+
+This report examines the evolving patterns of housing stress in Australia between 2013 and 2019, identifying the most vulnerable demographic groups and exploring the key factors that drive financial strain related to housing costs. Using national household survey data, the study applies both descriptive and inferential analysis — including logistic regression — to reveal structural inequalities that contribute to housing stress. Key findings indicate that lone-person households under 35, single-parent families, and female-headed households remain consistently at higher risk. The study also highlights how factors such as tenure type, purchase price, and household size significantly influence the likelihood of housing stress. The insights generated aim to inform policymakers and contribute to discussions on targeted housing affordability interventions.
+
+
+# Introduction
+
+Housing affordability has become one of the most pressing social and economic challenges in Australia. The growing mismatch between housing supply and population growth has placed considerable pressure on both renters and prospective homeowners. The concept of housing stress — commonly defined as households spending more than 30% of their gross income on housing costs — has become a widely used indicator of financial vulnerability (ABC News, Hutchens, 2024).
+
+The purpose of this report is to explore how housing stress has evolved over time, to identify which groups are most affected, and to uncover the underlying drivers of this financial burden. The analysis also aims to create accessible and interpretable visual tools that can communicate findings effectively to policymakers and the public.
+
+This work was conducted as part of an internship project at the Australian Institute of Family Studies, focusing on translating analytical evidence into policy-relevant insights.
+
+
+# Background and Motivation : 
+
+Australia’s housing landscape has experienced significant shifts over the past two decades. Escalating property prices, limited housing supply, and slow wage growth have created conditions where many households — particularly those with children or on lower incomes — struggle to meet housing costs.
+
+According to the 2024 ABC News report, housing stress has “risen sharply since the early 2000s,” with more Australians spending disproportionate amounts of income on housing (Hutchens, 2024). This trend has profound implications for family wellbeing, social inclusion, and economic stability.
+
+Beyond simple affordability concerns, housing stress affects family functioning, mental health, and intergenerational mobility. Families under persistent housing stress are more likely to face financial insecurity, relationship strain, and poorer health outcomes. These consequences make housing stress not merely an economic issue, but a broader social and policy challenge.
+
+The motivation for this study arises from these concerns. By analysing national household survey data across multiple years, this project aims to clarify which groups face the highest burden and why — thereby helping to inform future housing and welfare policy.
+
+# Objectives
+
+The analysis has four main objectives:
+
+**Topic 1:** To describe how housing stress levels have changed over time (2013–2019) and identify which demographic and household groups are most at risk.
+
+**Topic 2:**: To model key drivers — such as household structure, education, tenure type, and financial variables — that explain housing stress.
+
+Finally to translate findings into practical, policy-relevant insights.
+
+This study was undertaken as part of my internship at the Australian Institute of Family Studies (AIFS), an independent statutory agency of the Australian Government within the Department of Social Services. AIFS conducts high-quality research to increase understanding of the factors that affect family wellbeing and to inform government policy and service delivery. Its work covers diverse areas such as family relationships, housing and financial security, child wellbeing, and social inclusion.
+
+As an intern analyst at AIFS, my role focused on using data-driven methods to explore issues affecting Australian families, particularly in relation to housing affordability and economic stress. This project was designed not only as an academic exercise but as a practical contribution to AIFS’s mission of supporting evidence-based policy.
+
+The analysis contributes to this broader goal by producing reproducible, interpretable, and visually engaging insights that can be shared with policymakers, researchers, and the public.
+
+# Data Processing
+
+## Overview
+
+The Statistical Income and Housing (SIH) microdata for 2013 and 2019 were prepared and harmonised into household-level analysis files. The following sections document the steps performed to construct the analysis datasets, the rationale behind key transformations, and important implementation checks. All operations are described in a neutral, reproducible manner and correspond to the R code used in the analysis pipeline.
+
+
+## 1. Loading raw files
+Household-level, person-level, income and loan CSV files were read for both survey years. The files correspond to the SIH file components:
+
++ BH — household-level file
+
++ BP — person-level file
+
++ BI — income (income unit / person) file
+
++ BL — loans / borrowings file
+
+```{r, echo=TRUE, eval=FALSE}
+#load data
+household <- read_csv("data/CSV/SIH19BH.csv", show_col_types = FALSE)
+income <- read_csv("data/CSV/SIH19BI.csv", show_col_types = FALSE)
+loans <- read_csv("data/CSV/SIH19BL.csv", show_col_types = FALSE)
+person <- read_csv("data/CSV/SIH19BP.csv", show_col_types = FALSE)
+
+#load older data
+household2013 <- read_csv("data/CSV/SIH13BH.csv", show_col_types = FALSE)
+income2013 <- read_csv("data/CSV/SIH13BI.csv", show_col_types = FALSE)
+loans2013 <- read_csv("data/CSV/SIH13BL.csv", show_col_types = FALSE)
+person2013 <- read_csv("data/CSV/SIH13BP.csv", show_col_types = FALSE)
+```
+
++ Reading both 2013 and 2019 prepares the data for direct comparison across years.
+
++ read_csv(..., show_col_types = FALSE) suppresses the printing of column type messages for cleaner logs while preserving column types.
+
+## 2. Aggregating loan records to household level
+
+Loan records are at the loan-level and were aggregated to household totals using the household identifier (ABSHID). The aggregated measures produced are:
+
++ hh_total_weekly_repayments — sum of weekly repayments per household
+
++ hh_total_outstanding — sum of outstanding loan balances per household
+
++ hh_num_loans — number of loan records associated with the household
+
+
+```{r,  echo=TRUE, eval=FALSE}
+#Aggregate loans (household-level debt measures)
+
+loans_agg <- loans %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+
+
+loans_agg2013 <- loans2013 %>%
+  group_by(ABSHID) %>%
+  summarise(
+    hh_total_weekly_repayments = sum(WKREPLN, na.rm = TRUE),
+    hh_total_outstanding = sum(AMTOLN, na.rm = TRUE),
+    hh_num_loans = n(),
+    .groups = "drop"
+  )
+```
+
++ Aggregation converts loan-level detail into household-level covariates suitable for modelling and descriptive statistics.
+
++ na.rm = TRUE prevents missing loan entries from producing NA sums; the semantic meaning of missing values should be assessed (e.g., missing vs no loans).
+
+## 3. Aggregating income-unit / income records to household level
+
+Income records were aggregated by household to create an auxiliary household-level income measure and a count of income units:
+```{r,  echo=TRUE, eval=FALSE}
+iu_agg <- income %>%
+group_by(ABSHID) %>%
+summarise(
+hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+hh_num_ius = n(),
+.groups = "drop"
+)
+
+iu_agg2013 <- income2013 %>%
+group_by(ABSHID) %>%
+summarise(
+hh_income_from_ius = sum(INCTSCU8, na.rm = TRUE),
+hh_num_ius = n(),
+.groups = "drop"
+)
+```
+
++ Summed income from income units provides an independent check against the household income variable in the household file and supports alternative income constructions when required.
+
+## 4. Extracting household reference person attributes
+
+Person-level variables for the household reference person (HHPOS == 1) were selected and transformed into household-level indicators. A proxy for the health status of the household head was constructed as a binary flag:
+
+```{r,  echo=TRUE, eval=FALSE}
+person_head <- person %>%
+filter(HHPOS == 1) %>%
+select(ABSHID, SAHQ01, AGEEC, SEXP, LVLEDUA) %>%
+mutate(
+head_poor_health_flag = case_when(
+SAHQ01 %in% c(4,5) ~ 1L,
+TRUE ~ 0L
+)
+)
+
+person_head2013 <- person2013 %>%
+filter(HHPOS == 1) %>%
+select(ABSHID, DISBPER, AGEBC, SEXP) %>%
+mutate(
+head_poor_health_flag = case_when(
+DISBPER == 2 ~ 1L,
+TRUE ~ 0L
+)
+)
+```
+
++ The household reference person provides demographic and wellbeing proxies that are informative at the household level.
+
++ Differences in variable names between years were handled explicitly to harmonise equivalent constructs.
+
+## 5. Merging components into a household analysis file
+
+Aggregated loan and income measures and the household reference person attributes were merged onto the household frame using left joins keyed by ABSHID:
+
+```{r, echo=TRUE, eval=FALSE}
+hh_merged <- household %>%
+left_join(loans_agg, by = "ABSHID") %>%
+left_join(iu_agg, by = "ABSHID") %>%
+left_join(person_head, by = "ABSHID")
+
+hh_merged2013 <- household2013 %>%
+left_join(loans_agg2013, by = "ABSHID") %>%
+left_join(iu_agg2013, by = "ABSHID") %>%
+left_join(person_head2013, by = "ABSHID")
+```
+
++ Left joins preserve the household sampling frame while attaching derived covariates. Households lacking particular records (e.g., no loans) appear with NA in the relevant fields, allowing for explicit treatment of missingness downstream.
+
+## 6. Variable renaming and harmonisation
+
+A mapping of original variable codes to descriptive names was applied to improve the readability and reproducibility. Conditional renaming was used to accommodate differences in variable availability between years.
+```{r, echo=TRUE, eval=FALSE}
+rename_map <- c(
+"SIHHHWT"   = "hh_weight",
+"HCOSTH8A"  = "weekly_housing_cost_pct",
+"HCOST10A"  = "weekly_housing_cost_cat",
+"INCTSCH8"  = "hh_total_weekly_income",
+"DISPSCH8"  = "hh_weekly_disposable_income",
+"LIFECYCH"  = "life_cycle_group_code",
+"DPKIDHBC"  = "num_dependents_under25",
+"FSTRSS19"  = "num_financial_stress_events",
+"EMGMONEY"  = "ability_raise_2000_flag"
+)
+
+for(orig in names(rename_map)){
+if(orig %in% names(hh_merged)){
+hh_merged <- hh_merged %>% rename(!!rename_map[[orig]] := all_of(orig))
+}
+}
+
+for(orig in names(rename_map)){
+if(orig %in% names(hh_merged2013)){
+hh_merged2013 <- hh_merged2013 %>% rename(!!rename_map[[orig]] := all_of(orig))
+}
+}
+```
+
++ Human-readable variable names facilitate interpretation of tables, figures and model specifications and reduce error when sharing code.
+
+## 7. Recoding life-cycle groups and deriving outcome flags
+
+Numeric life-cycle codes are recoded to descriptive labels. Multiple housing-stress indicators were constructed using different thresholds to support sensitivity analyses:
+
+```{r,  echo=TRUE, eval=FALSE}
+hh_merged <- hh_merged %>%
+mutate(
+life_cycle_group = case_when(
+life_cycle_group_code == 0  ~ "Not applicable",
+life_cycle_group_code == 1  ~ "Lone person <35",
+life_cycle_group_code == 2  ~ "Couple (ref <35)",
+life_cycle_group_code == 3  ~ "Couple w dependents, eldest <5",
+life_cycle_group_code == 4  ~ "Couple w dependents, eldest 5-14",
+life_cycle_group_code == 5  ~ "Couple w dependents, eldest 15-24",
+life_cycle_group_code == 6  ~ "One parent w dependents",
+life_cycle_group_code == 7  ~ "Couple w dep & non-dep",
+life_cycle_group_code == 8  ~ "Couple w non-dep only",
+life_cycle_group_code == 9  ~ "Couple (ref 55-64)",
+life_cycle_group_code == 10 ~ "Couple (ref 65+)",
+life_cycle_group_code == 11 ~ "Lone person 65+",
+TRUE ~ paste0("Other (", life_cycle_group_code, ")")
+),
+housing_stress_flag = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 30 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 30 ~ 0L,
+TRUE ~ NA_integer_
+),
+housing_stress_flag_20 = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 20 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 20 ~ 0L,
+TRUE ~ NA_integer_
+),
+housing_stress_flag_40 = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 40 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 40 ~ 0L,
+TRUE ~ NA_integer_
+),
+housing_stress_flag_50 = case_when(
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct > 50 ~ 1L,
+!is.na(weekly_housing_cost_pct) & weekly_housing_cost_pct <= 50 ~ 0L,
+TRUE ~ NA_integer_
+),
+ability_raise_2000 = case_when(
+ability_raise_2000_flag == 1 ~ "Can raise $2000",
+ability_raise_2000_flag == 5 ~ "Cannot raise $2000",
+TRUE ~ NA_character_
+)
+)
+```
+
++ Descriptive life-cycle labels reduce reliance on codebooks in figures and tables.
+
++ Multiple housing-stress flags enable sensitivity analysis to threshold choice and facilitate characterization of varying degrees of cost burden.
+
+
+## 8. Constructing survey replicate design objects
+
+Replicate-weight columns are identified programmatically and survey-replicate designs were created using srvyr::as_survey_rep with Fay’s method (rho = 0.5):
+
+```{r, echo=TRUE, eval=FALSE}
+#rep_cols <- grep("^WHS\d{2}$", names(hh_merged), value = TRUE)
+
+hh_svy <- hh_merged %>%
+as_survey_rep(weights = hh_weight,
+repweights = all_of(rep_cols),
+type = "Fay",
+rho = 0.5)
+```
+An equivalent procedure was used for the 2013 dataset, with a year-specific pattern for the replicate-weight column names.
+
+Rationale and benefits:
+
++ The SIH is a complex survey; proper variance estimation requires replicate weights rather than naive standard errors from simple random-sample assumptions.
+
++ Replicate weights supplied by the ABS reflect the original complex design and permit design-consistent variance estimation.
+
++ Fay’s method is a BRR variant that reduces perturbation extremes and tends to produce more stable variance estimates; rho = 0.5 is a conventional Fay factor for ABS replicate weights.
+
++ The srvyr interface integrates survey-package variance estimation with tidyverse-style pipelines, enabling readable and reproducible analysis code (e.g., group_by() and summarise() combined with survey_mean() and survey_total()).
+
+
+
+# Topic 1: Visualization
+
+## Exploratory Data Analysis
+
+### Housing stress distribution across different life cycle groups
+
+```{r, results='show'}
+ggplotly(p1)
+ggplotly(p2)
+ggplotly(p3)
+ggplotly(p4)
+```
+
+**Observations:** 
+Across the four housing stress thresholds (>20%, >30%, >40%, and >50%), the data reveals a consistent and meaningful pattern of inequality across different life-cycle groups. When housing stress is defined at the standard 30% threshold, the group most severely affected is lone persons under 35 years old, with nearly 40% of them spending more than 30% of their household income on housing costs. This indicates that younger individuals living alone face the greatest affordability challenges, likely due to lower average incomes, limited asset accumulation, and high rental expenses relative to their earnings. The second-highest stress levels are found among one-parent families with dependent children, with roughly 30% of this group exceeding the 30% affordability benchmark. This reflects the financial pressure of raising children on a single income while managing housing expenses. Moderate levels of housing stress are observed among lone persons aged 65 and above and households classified as “not applicable,” with around 20% of these groups under stress, possibly reflecting fixed or limited retirement incomes. In contrast, various couple households, particularly those with adult children or mixed-age dependents, exhibit substantially lower stress levels, generally below 10%, indicating the financial stability that can arise from shared income and housing resources.
+
+When the threshold is lowered to 20%, a much larger portion of households fall into the stressed category. More than 60% of young singles and single-parent families exceed this lower cutoff, highlighting their widespread financial vulnerability even under a less stringent definition of housing stress. Older singles also experience notable strain at this level, with around 60% exceeding the 20% threshold, suggesting that many retirees face housing costs that, while not extreme, still consume a considerable portion of their fixed income. By contrast, couple households with children, especially those where the eldest child is under 14, show moderate stress (around 40–45%), while couples with only adult children or couples with mixed dependent and non-dependent children display relatively low stress (below 20%).
+
+At higher thresholds of 40% and 50%, the same ranking of vulnerability persists, but with reduced proportions overall. Lone persons under 35 remain the most burdened group, with about 20% spending over 40% of their income on housing and around 15% exceeding the 50% mark. Single-parent families follow closely behind, with approximately 15% and 12% under these respective thresholds. Meanwhile, older singles and “not applicable” households show around 10% experiencing severe stress at these higher cutoffs, suggesting that while their housing costs are often high relative to income, they are less likely to face extreme affordability crises. In contrast, couple households, across all configurations, display remarkable resilience: their proportions under severe stress drop below 10% at the 40% threshold and fall further below 5% at the 50% level. This pattern demonstrates that shared financial resources and stable tenure arrangements—such as home ownership—substantially buffer couples from extreme housing cost burdens.
+
+Taken together, these findings highlight systematic disparities in housing affordability across life stages and household structures. Young single adults and single-parent families consistently face the highest levels of financial strain, regardless of how housing stress is defined. This persistent pattern underscores the challenges of achieving housing stability among groups with limited earning capacity, fewer economies of scale, and greater exposure to the private rental market. Older single-person households, while moderately stressed, tend to cluster within the 20–40% range, reflecting constrained but somewhat stable housing conditions. In contrast, couple households benefit from income pooling and tenure security, which reduce their vulnerability even under rising housing costs. These cross-threshold trends reveal deep structural inequalities in Australia’s housing system, emphasizing the need for targeted policy interventions—particularly those aimed at assisting young individuals entering the housing market and supporting single parents facing ongoing affordability pressures.
+
+**Source of Dataset:** see readme file to download dataset. 
+
+### Houing purchase price in different state 
+
+```{r, results='show'}
+
+ggplotly(p_price)
+
+```
+
+**Observations:** 
+Between 2013 and 2019, housing price trends across Australia’s states show clear and widening regional disparities. New South Wales (NSW) recorded the most dramatic growth, with average dwelling prices rising from around AUD 590,000 in 2013 to approximately AUD 810,000 in 2019, representing an increase of over 37%—the highest in the country and maintaining its position as the most expensive housing market. Victoria followed a similar trajectory, with prices climbing from AUD 510,000 to around AUD 705,000, an impressive 38% growth, ranking second nationally. The Australian Capital Territory (ACT), though lacking full 2013 data, reached an average of AUD 650,000 in 2019, reflecting steady and solid growth. Queensland showed moderate but stable increases, with prices moving from AUD 460,000 to AUD 530,000, a 15% rise. South Australia experienced only mild growth—from AUD 415,000 to AUD 450,000, less than 10%, indicating a relatively sluggish market. Tasmania, traditionally the most affordable state, saw minimal change, increasing from AUD 360,000 to about AUD 385,000, a rise of less than 7%, maintaining the lowest price level nationwide. In contrast, the Northern Territory saw prices slightly decline from AUD 540,000 to AUD 530,000, showing almost no net growth, while Western Australia experienced the only significant price drop, falling from AUD 530,000 to AUD 490,000, a decrease of more than 7%. Overall, these divergent trends highlight a polarized housing market: New South Wales and Victoria emerged as the dominant growth leaders, with prices soaring well above other states, while Tasmania, South Australia, and Western Australia lagged behind. By 2019, the price hierarchy was firmly stratified—NSW (810k) > Victoria (705k) > ACT (650k) > Queensland (530k) ≈ Northern Territory (530k) > Western Australia (490k) > South Australia (450k) > Tasmania (385k)—revealing a growing structural divide between high- and low-cost regions. This pattern underscores a process of “divergent growth” in the Australian housing market, where economic concentration, population growth, and state-level policy environments have deepened spatial inequality and entrenched regional differences in housing affordability.
+
+**Source of Dataset:** see readme file to download dataset. 
+
+
+### Houing weekly cost among different life cycle groups
+
+```{r, results='show'}
+
+ggplotly(p_cost)
+
+```
+
+**Observations:** 
+Between 2013 and 2019, housing cost patterns across life-cycle groups show clear structural differences and a progressively widening burden gap. Couple households with dependent children consistently faced the highest housing costs and the most pronounced increases: households with the eldest child aged under 5 saw costs rise from AUD 458 to 486, those with children aged 5–14 increased sharply from AUD 443 to 510 (the highest cost level in 2019), and those with children aged 15–24 rose from AUD 383 to 448. These substantial increases reflect the larger dwelling requirements and higher living expenses for families with children, reinforcing their position as the most financially pressured group. Young single-person households and single-parent families also experienced high and rising costs: young singles increased from AUD 301 to 335, while one-parent families rose from AUD 289 to 333, both remaining in the upper cost tier in 2019 due to limited income sharing and elevated housing needs. In contrast, older households faced far lower and more stable housing costs: couples aged 65+ saw a modest increase from AUD 73 to 90, and older singles rose from AUD 69 to 90, reflecting smaller housing requirements, higher rates of outright homeownership, and relatively stable income structures. Among other couple groups, trends were highly differentiated: couples with reference persons under 35 saw only a slight increase (AUD 430 to 439), while couples aged 55–64 experienced the largest rise of all groups—AUD 187 to 260, likely driven by housing upgrades or changing financial arrangements. Couples with both dependent and non-dependent children saw almost no change (AUD 363 to 365), suggesting stable household structures that buffer against rising costs, and couples with only adult children saw moderate growth (AUD 242 to 281). Overall, the period shows broad but uneven housing cost inflation, with increases ranging from negligible amounts to more than AUD 70. A clear cost hierarchy persists: families with dependent children sit at the top, followed by young singles and single parents, while older households and those with adult children remain in the lowest tier. This structure did not change over time, underscoring that family composition, household size, and income-sharing capacity are the key determinants of housing cost burden. The stability of certain groups—particularly mixed dependent/non-dependent families—highlights how specific household configurations can moderate exposure to market fluctuations. Collectively, the trends point to a pattern of differentiated cost escalation, where families with children, young singles, and single-parent households shoulder disproportionate and intensifying housing pressures, while older households experience consistently lighter and more stable burdens.
+
+**Source of Dataset:** see readme file to download dataset. 
+
+### Houing weekly income among different life cycle groups
+
+```{r, results='show'}
+ggplotly(p_income)
+```
+
+**Observations:** 
+Between 2013 and 2019, household income across different life-cycle groups in Australia exhibited a pattern of sharply differentiated growth, largely driven by family structure, labour-force capacity, and age composition. Couple families with children consistently recorded the highest incomes and some of the most substantial increases: couples with dependents where the eldest child was under 5 rose from AUD 3,555 to AUD 4,139 (+AUD 584, the highest 2019 level), while those with dependents aged 15–24 increased from AUD 2,990 to AUD 3,653 (+AUD 663, the largest overall gain), reflecting the contribution of older dependents who can also participate in the workforce. Couples with dependents aged 5–14 saw more moderate growth from AUD 2,970 to AUD 3,224 (+AUD 254), while couples with non-dependent adult children rose sharply from AUD 2,904 to AUD 3,510 (+AUD 606), again underscoring the income effect of multiple earners. Younger couples and older couples showed contrasting trajectories: couples under 35 increased their income from AUD 2,469 to AUD 2,938 (+AUD 469) as they advanced through early career stages, whereas couples aged 55–64 were the only group to experience a decline, falling from AUD 2,362 to AUD 2,287 (–AUD 75) due to retirement transitions and reduced labour-force participation. Single-person and single-parent households remained in lower income tiers: young singles grew modestly from AUD 1,184 to AUD 1,377 (+AUD 193), and lone persons 65+ increased from AUD 635 to AUD 774 (+AUD 139), remaining the lowest-income group overall because they rely primarily on pension or asset-based income. Single parents with dependents rose from AUD 1,364 to AUD 1,610 (+AUD 246), positioned above single adults but below the majority of couple households due to single-earner constraints. Complex households—couples with both dependent and non-dependent children—experienced moderate growth from AUD 1,262 to AUD 1,486 (+AUD 224), with mixed age structures producing slower income expansion than in families with only older or only younger children. Overall, the period reflected strongly uneven income growth, ranging from declines (–AUD 75 among couples aged 55–64) to substantial increases exceeding AUD 600 in groups with multiple potential earners. A clear income hierarchy persisted throughout 2013–2019: (1) top-earning households were couples with children—especially those with older dependents; (2) mid-tier groups included young couples and couples with adult children; (3) lower-income groups comprised single parents and younger single adults; and (4) the lowest tier consisted of older single individuals. These patterns illustrate a structural trend of “differentiated income expansion,” where household labour-force size, age composition, and employment stage are the primary forces shaping both income levels and growth trajectories.
+
+**Source of Dataset:** see readme file to download dataset. 
+
+## Final Visualisation 
+
+```{r, results='show'}
+ggplotly(p_afford)
+```
+
+**Observations:** 
+The housing affordability ratio (weekly housing cost ÷ weekly income) reveals substantial variation across life-cycle groups and clear divergence between 2013 and 2019. The burden gap between groups was highly polarised, with certain households facing extremely high ratios: young single adults (Lone person <35) recorded an exceptionally heavy burden, falling from a very high 279.4% in 2013 to 161% in 2019, meaning housing costs far exceeded income even after the decline. Older single adults (Lone person 65+) showed an extraordinary shift from 660.7% in 2013 to 2.5% in 2019, a dramatic change likely driven by differences in income reporting, sample composition, or major structural shifts in economic circumstances. Single parents (One parent with dependents) consistently experienced high burden levels, remaining around 57.6% in both years, indicating persistent affordability pressure. Some groups experienced moderate burden levels, such as younger couples (Couple ref <35), whose ratio surged from 24.3% to 57.9%, representing a sharp deterioration in affordability, while couples aged 55–64 saw their burden drop dramatically from 137.8% to 55.8%, marking a substantial improvement. Meanwhile, the lowest-burden groups included most couple families with children, couples with adult children, and older couples, many of whom recorded ratios below 20%, with several falling below 5% by 2019, reflecting very light housing cost pressures. From 2013 to 2019, trends diverged significantly: housing burden intensified sharply for younger couples, fell markedly for older couples, families with young children, and couples with adult children—often with reductions exceeding 50%—and remained largely stable for single parents and couples with older dependent children, where changes stayed within ±5%. Overall, the figure illustrates a pattern of intensifying inequality in housing affordability, where some groups face persistent or worsening strain while others experienced major relief.
+
+```{r, results='show'}
+ggplotly(p_stress, tooltip = c("x", "fill", "y"))
+```
+
+**Observations:** 
+The figure on the proportion of households experiencing housing stress (defined as spending more than 30% of income on housing) by gender in 2013 and 2019 shows a clear and persistent gender gap, even when considering the 95% confidence intervals. In 2013, female-led households had a noticeably higher housing stress rate (around 20%) compared with male-led households (around 16%), and the same pattern persisted in 2019, with female households at approximately 18% and male households at about 14%. This consistent disparity suggests that women are structurally more vulnerable to housing stress, likely influenced by differences in earnings, employment patterns, and caregiving responsibilities. Between 2013 and 2019, both groups experienced a modest decline in the prevalence of housing stress—male households dropping from about 16% to 14%, and female households from about 20% to 18%—indicating a slight overall improvement in affordability conditions. However, despite this general downward movement, the gender gap remained essentially unchanged, highlighting the persistent nature of gendered housing inequality.
+
+## Conclusion
+The two visualisations together highlight a deeply uneven landscape of housing affordability in Australia, where both life-cycle stage and gender shape households’ exposure to financial stress in distinct but interconnected ways. The first figure shows that affordability pressures vary dramatically across household types, with young single adults, single parents, and some older single households experiencing the most severe burdens. These extremes—such as ratios well above 100% for young adults in 2013 or the dramatic shift among older singles—underscore how volatile and vulnerable certain life-cycle groups are to changes in income, labour market conditions, or housing costs. In contrast, many couple-based households, particularly those older or with adult children, report very low burdens that improved further by 2019, suggesting stable income positions and stronger capacity to absorb rising housing costs. Overall, the widening divergence between groups points to a pattern of intensifying affordability inequality: while some households experienced significant relief, others remained persistently or increasingly strained.
+
+The second visualisation reinforces this inequality by revealing a persistent gender gap in housing stress. Female-led households consistently face higher rates of spending more than 30% of income on housing than male-led households, with the disparity holding steady from 2013 to 2019 despite slight improvements for both groups. This suggests that gendered economic disadvantages—such as lower average earnings, greater likelihood of part-time work, and higher caregiving responsibilities—continue to limit women’s housing security, regardless of broader market conditions. Taken together, the two sets of findings point to structural vulnerabilities that disproportionately affect young singles, single parents, and women. These results indicate that improvements in overall housing conditions do not translate evenly across demographic groups and emphasise the need for targeted policy responses that address both life-cycle-specific and gendered inequalities in housing affordability.
+
+
+
+# Topic 2: Logistic model regression interpretation
+
+This analysis fits a logistic regression model predicting a binary housing-stress outcome (HousingStress = 1 when weekly housing costs exceed 30% of gross household income). The model uses demographic, socioeconomic, and household-structure predictors—such as life-cycle group, household size, education level, age of youngest child, state, tenure type, purchase-price proxy, and sex—and is estimated with a binomial logit link. The purpose is to understand which household characteristics are associated with higher odds of experiencing housing stress.
+
+```{r, results='show'}
+summary(model)
+car::vif(model)
+
+summary(model_clean)
+car::vif(model_clean)
+```
+
+## Methodology
+
+The accompanying code first constructs a cleaned analytic dataset by selecting relevant variables, removing inapplicable tenure codes, recoding invalid age values, converting categorical variables to factors, and defining the binary HousingStress indicator; missing values are then handled using predictive mean-matching multiple imputation (via mice()). A Cook’s-distance procedure is then applied to an existing fitted logistic model to identify influential observations: Cook’s distances are computed, thresholds (4/(n–p) and 4/n) are established, flagged cases are listed and visualised, and those observations exceeding the threshold are removed to create a cleaned dataset. The logistic model is then refitted on the cleaned sample with the same predictors plus explicitly specified non-linear terms for scaled dwelling-purchase price and household size. Model fit is compared using AIC, and multicollinearity is assessed using VIF. Finally, diagnostic checking is extended by generating an augmented data frame (via augment(model_clean)) and plotting fitted values against residuals using ggplot2; this provides a visual assessment of model adequacy, potential patterns in residuals, and any remaining signs of mis-specification.
+
+## Observation
+
+**Residual Deviance:**  
+The residual deviance of the original model was **12,591**, while the improved model reduced it to **7,645**.  
+Residual deviance reflects the amount of unexplained variation in the model—**lower values indicate stronger explanatory power**.  
+The substantial drop means the improved model explains variation in housing stress much more effectively.
+
+**AIC (Akaike Information Criterion):**  
+The original model had an AIC of **12,667**, which decreased to **7,721** in the improved model.  
+AIC incorporates both model fit and model complexity; **a lower AIC implies a better-performing model**.  
+The large decrease demonstrates that the improved model achieves substantially better model fit without adding unnecessary complexity.
+
+**Coefficient Significance:**  
+
+In the improved model, variables such as **Life_Cycle_Group**, **Age_Youngest_Child**, **State**, **Tenure_type**, and **sex_group** remain highly significant.  
+By contrast, several categories of **Education_Level** were not significant in the original model.  
+This indicates that after refinement, the relationships between predictors and **housing stress** are clearer, stronger, and more interpretable.
+
+**Multicollinearity Analysis (VIF):**  
+
+We examined the VIF values from the original model (based on `car::vif`).  
+Interpretation relies on **GVIF^(1/(2*Df))**, which adjusts for multi-category categorical predictors.
+
+- **Household_Size** had a GVIF-adjusted value of **1.91**, close to the threshold of **2**, indicating mild multicollinearity.  
+- Other predictors, including **Education_Level**, **State**, and **sex_group**, had adjusted GVIF values close to **1**, showing minimal collinearity.
+
+The improved model also suggests minimal collinearity, as the adjusted GVIF values for the predictors remain close to 1. We expect reduced multicollinearity because **non-linear transformations and outlier removal** generally reduce artificial linear dependencies among predictors.
+
+## Residual Diagnostics
+
+```{r, results='show'}
+p_residual 
+```
+
+The residual plot for the improved model shows:
+
+- Stable and flat residual patterns when fitted values are between roughly –30 and –10. This indicates that the nonlinearity issues present in the original model have been substantially resolved.
+
+- Local instability near fitted values close to 0, where residuals show more extreme variation. This suggests that some local outlier effects or remaining nonlinearity still need further examination.
+
+## Discussion
+The improved model highlights several important relationships. Households such as lone persons under 35, one-parent families, and couples with dependents have significantly higher odds of experiencing housing stress compared with the reference group, indicating that life-cycle structure is a key determinant. Households with younger children also face greater risk, as shown by the negative association between the age of the youngest child and housing stress. Strong regional effects are present, with households in all other states showing lower housing stress than those in the reference state(NSW). Tenure types associated with renting or mortgage payments substantially increase the likelihood of housing stress, while male-led households are less likely to experience stress than female-led ones. Finally, the negative squared term for household size suggests a nonlinear relationship where larger households benefit from income pooling, reducing their overall housing stress risk.
+
+## Conclusion
+
+Overall, the improved logistic regression model provides a clearer, more robust, and more interpretable understanding of the factors associated with household housing stress. By addressing missing data, removing influential outliers, and incorporating important non-linear effects, the model achieves substantially better fit—as reflected by large reductions in both residual deviance and AIC—while also improving the consistency and significance of key predictors. The findings indicate that housing stress is strongly shaped by household life-cycle stage, childcare responsibilities, state of residence, and tenure type, with female-led and renter/mortgagor households facing notably higher risks. The nonlinear relationship with household size suggests the presence of income-sharing benefits that reduce stress in larger households. Although some local residual irregularities remain, the overall diagnostics indicate that the refined model captures the main structural drivers of housing stress effectively, providing a solid foundation for further analysis or policy-relevant interpretation.
+
+# Policy recommendations
+
+**Support for Young Single Adults and Early-Career Renters:**
+
+Young single-person households consistently face the highest housing cost burden. Policy interventions could include expanding affordable rental housing, introducing rent subsidies or housing vouchers, and incentivizing shared housing options to reduce per-person costs. Programs that facilitate first-time homeownership for young adults, such as low-deposit schemes or government-backed loans, could also alleviate early-career financial strain.
+
+**Assistance for Single-Parent Families:** 
+
+Single-parent households face persistently high housing stress. Policies could target this group through tailored rental assistance, childcare-linked housing support, or income supplements. Increasing access to social housing specifically for single-parent households and ensuring proximity to employment and schools would improve affordability and quality of life.
+
+**Gender-Sensitive Housing Interventions:**
+
+Female-led households experience higher housing stress rates, reflecting income disparities and caregiving responsibilities. Policies should integrate gender-sensitive measures, including income support programs, subsidized rental housing for low-income women, and initiatives to close the gender pay gap. Support for single mothers, such as combined housing and childcare programs, would address intersecting vulnerabilities.
+
+# Limitations and Future Work
+
+The main limitation of this analysis is the data coverage period, which ends in 2019 — prior to the COVID-19 pandemic. Housing markets and affordability patterns have changed substantially since then, influenced by rising interest rates, inflation, and shifts in remote work.
+
+Future extensions will include:
+
++ Updating the analysis with post-2020 data to assess pandemic-era impacts;
+
++ Integrating regional housing market data to explore spatial inequalities; and
+
++ Considering dynamic models (e.g., mixed effects) to account for household-level variation over time.
+
+This continuation will enable a more complete understanding of housing stress in contemporary Australia.
+
+
+
+
+
+
+# References
+
++ Hutchens, G. (2024, May 14). Australia’s housing crisis in 10 graphs, from the federal budget. ABC News. https://www.abc.net.au/news/2024-05-15/federal-budget-housing-crisis-in-10-graphs/103847336
+
++ Wickham, H., Averick, M., Bryan, J., Chang, W., McGowan, L., François, R., … Yutani, H. (2019). tidyverse: Easily install and load the ‘tidyverse’ (R package version 1.3.2). https://CRAN.R-project.org/package=tidyverse
+
++ Lumley, T. (2020). survey: Analysis of complex survey samples (R package version 4.1-1). https://CRAN.R-project.org/package=survey
+
++ Thomas, L., & Lumley, T. (2019). srvyr: ‘dplyr’-style syntax for summary statistics of survey data (R package version 1.1.1). https://CRAN.R-project.org/package=srvyr
+
++ Wickham, H. (2023). scales: Scale functions for visualization (R package version 1.3.2). https://CRAN.R-project.org/package=scales
+
++ Müller, K., & Wickham, H. (2023). glue: Interpreted string literals (R package version 1.6.3). https://CRAN.R-project.org/package=glue
+
++ Sievert, C. (2020). plotly: Create interactive web graphics via ‘plotly.js’ (R package version 4.10.0). https://CRAN.R-project.org/package=plotly
+
++ Pedersen, T. L. (2020). patchwork: The composer of plots (R package version 1.1.2). https://CRAN.R-project.org/package=patchwork
+
++ Venables, W. N., & Ripley, B. D. (2002). nnet: Feed-forward neural networks and multinomial log-linear models (R package version 7.3-20). https://CRAN.R-project.org/package=nnet
+
++ Wickham, H., François, R., Henry, L., & Müller, K. (2023). dplyr: A grammar of data manipulation (R package version 1.1.3). https://CRAN.R-project.org/package=dplyr
+
++ Wickham, H., & Henry, L. (2023). tidyr: Tidy messy data (R package version 1.3.1). https://CRAN.R-project.org/package=tidyr
+
++ Fox, J., & Weisberg, S. (2019). car: Companion to applied regression (R package version 3.1-1). https://CRAN.R-project.org/package=car
+
++ Grömping, U., & Zeileis, A. (2021). brglm2: Bias reduction in generalized linear models (R package version 0.7.2). https://CRAN.R-project.org/package=brglm2
+
++ Heinze, G., & Ploner, M. (2022). logistf: Firth’s bias-reduced logistic regression (R package version 1.25). https://CRAN.R-project.org/package=logistf
+
++ Breheny, P., & Burchett, W. (2023). visreg: Visualization of regression models (R package version 2.9-0). https://CRAN.R-project.org/package=visreg
+
++ Robinson, D., & Hayes, A. (2023). broom: Convert statistical objects into tidy tibbles (R package version 1.0.9). https://CRAN.R-project.org/package=broom
+
++ van Buuren, S., & Groothuis-Oudshoorn, K. (2011). mice: Multivariate imputation by chained equations (R package version 3.14.0). https://CRAN.R-project.org/package=mice
+
+# Note
+“AI tools were used to assist with formatting references in APA7 style, improving syntax, and enhancing clarity. All ideas and content are my own.”
+
