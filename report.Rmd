@@ -1,11 +1,15 @@
 ---
 title: |
-  <br>**Housing Stress in Australia: Trends, Drivers, and Insights**
+  <div style="text-align:center;">
+    <strong>Housing Stress in Australia: Trends, Drivers, and Insights</strong><br>
+    <strong>Word Count: 5017</strong>
+  </div>
 author: |
   | Author: Chenghao Zeng
   | Supervisor: Rebecca Valenzuela, Australian Institute of Family Studies
 date: "25/10/2025"
-output: rmdformats::readthedown
+output: 
+  rmdformats::readthedown
 ---
 
 ```{r setup, include=FALSE}
